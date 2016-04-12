@@ -3,7 +3,7 @@
 *Note that the implementation is under heavy development. Use on your own risk!*
 
 This tool is demonstrating usage, benchmarking and verifying the implementation
-of [AF_KTLS socket](https://github.com/fridex/af-ktls/).
+of [AF_KTLS socket](https://github.com/fridex/af_ktls/).
 
 This tool consists of two parts - a client and a server. You can run server as
 a standalone process or you can run the server in a separate thread. Note that
@@ -76,8 +76,8 @@ socket operatiosn).
 ## Help
 
 To see all available options, see ```--help```. Feel free to visit
-[issues](https://github.com/fridex/af-ktls-tool/issues) page as well.
+[issues](https://github.com/fridex/af_ktls-tool/issues) page as well.
 
-See also [AF_KTLS](https://github.com/fridex/af-ktls), [AF_KTLS
-visualize](https://github.com/fridex/af-ktls-visualize).
+See also [AF_KTLS](https://github.com/fridex/af_ktls), [AF_KTLS
+visualize](https://github.com/fridex/af_ktls-visualize).
 
