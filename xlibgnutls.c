@@ -65,6 +65,7 @@ extern int xlibgnutls_dtls_handshake(gnutls_session_t *session, int udp_sd, unsi
 		//gnutls_transport_set_pull_timeout_function(*session, gnutls_pull_timeout_func_custom);
 	}
 
+	gnutls_dtls_set_mtu(*session, 1 << 14);
 	gnutls_set_default_priority(*session);
 	/* if more fine-graned control is required */
 	ret = gnutls_priority_set_direct(*session, "NORMAL", &err);
