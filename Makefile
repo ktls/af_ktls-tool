@@ -8,7 +8,7 @@ ktls.o: ktls.c
 	${CC} ${CFLAGS} ${LDFLAGS} $^ -c -o $@
 
 client: client.c benchmark.c server.c verify.c common.c connection.c xlibgnutls.c ktls.o action.c
-	${CC} ${CLFLAGS} ${LDFLAGS} $^ -o $@
+	${CC} ${CLFLAGS} ${LDFLAGS} -DBENCHMARK_RECV $^ -o $@
 
 server: server.c server-main.c common.c ktls.c
 	${CC} ${CFLAGS} ${LDFLAGS} $^ -o $@

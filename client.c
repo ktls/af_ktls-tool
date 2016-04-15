@@ -86,8 +86,6 @@
 #define OPT_SERVER_NO_ECHO      0x27
 #define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27"
 
-#define BENCHMARK_RECV
-
 static int thread_server_port = 0;
 
 static struct option long_options[] = {
