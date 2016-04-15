@@ -60,7 +60,7 @@ xecho "Preparing files"
 # server has to be run with --no-echo, to avoid kernel recv stack to be
 # fulfilled
 for protocol in "--tls" "--dtls"; do
-	for i in seq 1 3; do
+	for i in `seq 1 3`; do
 		for payload in 1000 1280 1400 4000 6000 9000 13000 16000; do
 
 			########## sendfile(2) vs userspace buffered copy
