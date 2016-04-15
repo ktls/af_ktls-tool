@@ -1,3 +1,8 @@
 client
 server
 *.o
+file_100MB.bin
+file_100kB.bin
+file_1MB.bin
+file_500MB.bin
+benchmarks
