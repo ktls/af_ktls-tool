@@ -9,7 +9,11 @@ FILE_500MB=${FILE_500MB:-file_500MB.bin}
 SERVER_PORT=${SERVER_PORT:-5557}
 SERVER_BIN=${SERVER_BIN:-./server}
 CLIENT_BIN=${CLIENT_BIN:-./client}
-BENCH_COUNT=${BENCH_COUNT:-100}
+BENCH_COUNT=${BENCH_COUNT:-5000}
+BENCH_TIME=${BENCH_TIME:-2}
+
+TLS_OVERHEAD=$((5 + 8 + 16))
+DTLS_OVERHEAD=$((13 + 8 + 16))
 
 CLIENT_EXEC="${CLIENT_BIN} --server-port ${SERVER_PORT} --server-host localhost --json --drop-caches"
 
@@ -59,6 +63,13 @@ xecho "Preparing files"
 for protocol in "--tls" "--dtls"; do
 	for i in `seq 1 3`; do
 		for payload in 1000 1280 1400 4000 6000 9000 13000 16000; do
+			# AF_KTLS is using MTU for raw data, without TLS/DTLS packetization
+			# overhead
+			if [ "${protocol}" == "--tls" ]; then
+				SENDFILE_MTU=$(( ${payload} + ${TLS_OVERHEAD} ))
+			else
+				SENDFILE_MTU=$(( ${payload} + ${DTLS_OVERHEAD} ))
+			fi
 
 			########## sendfile(2) vs userspace buffered copy
 			for file in "${FILE_100KB}" "${FILE_1MB}" "${FILE_100MB}" "${FILE_500MB}"; do
@@ -67,14 +78,14 @@ for protocol in "--tls" "--dtls"; do
 				[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
 
 				run_server "${protocol}" --no-echo
-				run_client "${protocol}" --sendfile "${file}" --sendfile-mtu ${payload} \
+				run_client "${protocol}" --sendfile "${file}" --sendfile-mtu ${SENDFILE_MTU} \
 					--sendfile-user ${file} --payload ${payload} \
 					--output "${TEST_OUTPUT_DIR}/output.${i}.json"
 				stop_server
 			done
 
-			########## sendmsg(2) and recvmsg(2)
-			TEST_OUTPUT_DIR="${OUTPUT_DIR}/transmission-${payload}${protocol}"
+			########## sendmsg(2) and recvmsg(2) - COUNT
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/transmission-count-${BENCH_COUNT}-${payload}${protocol}"
 			xecho "Performing benchmark, output ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
 
@@ -87,8 +98,8 @@ for protocol in "--tls" "--dtls"; do
 				--output "${TEST_OUTPUT_DIR}/gnutls-output.${i}.json"
 			stop_server
 
-			########## splice(2)
-			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-count-dev-null-${payload}${protocol}"
+			########## splice(2) - COUNT
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-count-dev-zero-${payload}${protocol}"
 			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
 			run_server "${protocol}" --no-echo
@@ -96,13 +107,45 @@ for protocol in "--tls" "--dtls"; do
 				--splice-file /dev/zero --output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
 
-			########### splice(2) echo -- "ping-pong"
+			########### splice(2) echo -- "ping-pong" - COUNT
 			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-echo-count-${payload}${protocol}"
 			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
 			run_server "${protocol}"
 			run_client "${protocol}" --splice-echo-count "${BENCH_COUNT}" --payload ${payload} \
-				--output "${TEST_OUTPUT_DIR}/output.${i}.json"
+				--sendfile-mtu ${SENDFILE_MTU} --output "${TEST_OUTPUT_DIR}/output.${i}.json"
+			stop_server
+
+			########## sendmsg(2) and recvmsg(2) - TIME
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/transmission-time-${BENCH_TIME}-${payload}${protocol}"
+			xecho "Performing benchmark, output ${TEST_OUTPUT_DIR}"
+			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
+
+			run_server "${protocol}"
+			run_client "${protocol}" --send-ktls-time "${BENCH_TIME}" --payload ${payload} \
+				--output "${TEST_OUTPUT_DIR}/ktls-output.${i}.json"
+			stop_server
+			run_server "${protocol}"
+			run_client "${protocol}" --send-gnutls-time "${BENCH_TIME}" --payload ${payload} \
+				--output "${TEST_OUTPUT_DIR}/gnutls-output.${i}.json"
+			stop_server
+
+			########## splice(2) - TIME
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-time-${BENCH_TIME}-dev-zero-${payload}${protocol}"
+			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
+			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
+			run_server "${protocol}" --no-echo
+			run_client "${protocol}" --splice-time "${BENCH_TIME}" --payload ${payload} \
+				--splice-file /dev/zero --output "${TEST_OUTPUT_DIR}/output.${i}.json"
+			stop_server
+
+			########### splice(2) echo -- "ping-pong" - TIME
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-echo-time-${BENCH_TIME}-${payload}${protocol}"
+			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
+			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
+			run_server "${protocol}"
+			run_client "${protocol}" --splice-echo-time "${BENCH_TIME}" --payload ${payload} \
+				--sendfile-mtu ${SENDFILE_MTU} --output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
 
 		done
