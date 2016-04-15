@@ -1,3 +1,6 @@
 [submodule "af_ktls"]
 	path = af_ktls
 	url = https://github.com/fridex/af_ktls/
+[submodule "af_ktls-visualize"]
+	path = af_ktls-visualize
+	url = https://github.com/fridex/af_ktls-visualize/
