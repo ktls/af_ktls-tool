@@ -48,9 +48,6 @@ xecho "Preparing files"
 [ -f "${FILE_100MB}" ] || dd if=/dev/urandom of="${FILE_100MB}" bs=1000 count=100000
 [ -f "${FILE_500MB}" ] || dd if=/dev/urandom of="${FILE_500MB}" bs=1000 count=500000
 
->"${SERVER_STDOUT}"
->"${SERVER_STDERR}"
-
 # we need to do comparison tests separately for Gnu TLS and AF_KTLS now because
 # Gnu TLS does not handle getting recv sequence number in DTLS, see xlibgnutls.c
 #
