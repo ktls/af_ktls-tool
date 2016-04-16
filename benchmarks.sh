@@ -149,12 +149,13 @@ for protocol in "--tls" "--dtls"; do
 			stop_server
 
 		done
+
 	done
 
-	for dir in "${OUTPUT_DIR}"/*; do
-		find "${dir}" -iname '*.json' -exec python merge_output.py "${dir}/output.json" {} \+
-	done
+done
 
+for dir in "${OUTPUT_DIR}"/*; do
+	find "${dir}" -iname '*.json' -exec python merge_output.py "${dir}/output.json" {} \+
 done
 
 xecho "Adding cpuinfo"
