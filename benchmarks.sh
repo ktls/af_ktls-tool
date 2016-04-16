@@ -111,7 +111,7 @@ for protocol in "--tls" "--dtls"; do
 			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-echo-count-${payload}${protocol}"
 			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
-			run_server "${protocol}"
+			run_server "${protocol}" --mtu ${payload}
 			run_client "${protocol}" --splice-echo-count "${BENCH_COUNT}" --payload ${payload} \
 				--sendfile-mtu ${SENDFILE_MTU} --output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
@@ -143,7 +143,7 @@ for protocol in "--tls" "--dtls"; do
 			TEST_OUTPUT_DIR="${OUTPUT_DIR}/splice-echo-time-${BENCH_TIME}-${payload}${protocol}"
 			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
-			run_server "${protocol}"
+			run_server "${protocol}" --mtu ${payload}
 			run_client "${protocol}" --splice-echo-time "${BENCH_TIME}" --payload ${payload} \
 				--sendfile-mtu ${SENDFILE_MTU} --output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
