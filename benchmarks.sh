@@ -163,8 +163,6 @@ cat /proc/cpuinfo > "${OUTPUT_DIR}/cpuinfo"
 
 for json in `find "${OUTPUT_DIR}" -iname 'output.json'`; do
 	xecho "Generating HTML statistics for ${json}"
-	xecho "!!! There is a bug in gnuplot-python; if you get stuck while generating plots,"
-	xecho "!!! hit ^C - receive stat plot will not be generated"
 	outdir=`dirname "${json}"`
 	./af_ktls-visualize/visualize.py --html-stats --input "${json}" --output-dir "${outdir}"
 done
