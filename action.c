@@ -64,7 +64,7 @@ static void print_send_count_stats(const struct client_opts *opts, bool gnutls, 
 	print_stats(msg, name, opts->payload_size, count, total_sent, total_recv, clocks);
 }
 
-static void print_send_time_stats(const struct client_opts *opts, bool gnutls, size_t total_sent, size_t total_recv, long unsigned elapsed) {
+static void print_send_time_stats(const struct client_opts *opts, bool gnutls, size_t total_sent, size_t total_recv, double elapsed) {
 	const char *json_msg = \
 		"  {\n"
 		"    \"test\": \"%s\",\n"
@@ -76,7 +76,7 @@ static void print_send_time_stats(const struct client_opts *opts, bool gnutls, s
 		"    \"result\": {\n"
 		"      \"sent\": %lu,\n"
 		"      \"received\": %lu,\n"
-		"      \"elapsed\": %lu\n"
+		"      \"elapsed\": %g\n"
 		"    }\n"
 		"  }";
 	const char *txt_msg = \
@@ -85,8 +85,8 @@ static void print_send_time_stats(const struct client_opts *opts, bool gnutls, s
 		"number of seconds:     %lu\n"
 		"total bytes sent:      %lu\n"
 		"total bytes received:  %lu\n"
-		"elapsed time:          %lu\n";
-	
+		"elapsed time:          %g\n";
+
 	const char *msg = opts->json ? json_msg : txt_msg;
 	const char *name = gnutls ? "gnutls_record_send()" : "send(2)";
 	const size_t time = gnutls ? opts->send_gnutls_time : opts->send_ktls_time;
@@ -122,7 +122,7 @@ static void print_splice_count_stats(const struct client_opts *opts, size_t tota
 	print_stats(msg, opts->payload_size, opts->splice_count, total_sent, total_recv, clocks);
 }
 
-static void print_splice_time_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, unsigned long elapsed) {
+static void print_splice_time_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, double elapsed) {
 	const char *json_msg = \
 		"  {\n"
 		"    \"test\": \"splice(2)\",\n"
@@ -133,7 +133,7 @@ static void print_splice_time_stats(const struct client_opts *opts, size_t total
 		"    \"result\": {\n"
 		"      \"sent\": %lu,\n"
 		"      \"received\": %lu,\n"
-		"      \"elapsed\": %lu\n"
+		"      \"elapsed\": %g\n"
 		"    }\n"
 		"  }";
 	const char *txt_msg = \
@@ -141,7 +141,7 @@ static void print_splice_time_stats(const struct client_opts *opts, size_t total
 		"data size per call:    %lu\n"
 		"total bytes sent:      %lu\n"
 		"total bytes received:  %lu\n"
-		"elapsed time:          %lu\n";
+		"elapsed time:          %g\n";
 
 	const char *msg = opts->json ? json_msg : txt_msg;
 
@@ -346,7 +346,7 @@ extern int do_send_time(const struct client_opts *opts, int ksd, void *mem, int 
 
 	err = stop_benchmark(&bst, &elapsed);
 
-	print_send_time_stats(opts, 0, total_sent, total_recv, elapsed);
+	print_send_time_stats(opts, 0, total_sent, total_recv, (double) elapsed / 1000);
 	if (err < 0)
 		print_error("failed to stop timer");
 
@@ -415,7 +415,7 @@ extern int do_gnutls_send_time(const struct client_opts *opts, gnutls_session_t 
 
 	err = stop_benchmark(&bst, &elapsed);
 
-	print_send_time_stats(opts, true, total_sent, total_recv, elapsed);
+	print_send_time_stats(opts, true, total_sent, total_recv, (double) elapsed / 1000);
 	if (err < 0)
 		print_error("failed to stop timer");
 
@@ -545,7 +545,7 @@ extern int do_splice_time(const struct client_opts *opts, int ksd) {
 out:
 	ret = stop_benchmark(&bst, &elapsed);
 	if (!err)
-		print_splice_time_stats(opts, total_sent, total_recv, elapsed);
+		print_splice_time_stats(opts, total_sent, total_recv, (double) elapsed / 1000);
 
 	if (ret < 0)
 		print_error("failed to stop timer");
@@ -620,7 +620,7 @@ extern int do_splice_echo_time(const struct client_opts *opts, int ksd, void *me
 out:
 	ret = stop_benchmark(&bst, &elapsed);
 	if (!ret)
-		print_splice_echo_time_stats(opts, total_sent, total_recv, elapsed);
+		print_splice_echo_time_stats(opts, total_sent, total_recv, (double) elapsed / 1000);
 
 	if (ret < 0)
 		print_error("failed to stop timer");
