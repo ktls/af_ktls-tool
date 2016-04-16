@@ -44,7 +44,6 @@
 
 #define SOCKET_ERR(err,s) if(err==-1) {perror(s);return(1);}
 #define DEFAULT_PORT 5557
-#define MAX_BUFFER (1 << 14)
 
 /*
  * we will do it with global var since we want to capture error in thread even
@@ -75,7 +74,7 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 
 	for (;;) {
 		do {
-			ret = gnutls_record_recv_seq(session, buffer, MAX_BUFFER, sequence);
+			ret = gnutls_record_recv_seq(session, buffer, opts->mtu, sequence);
 		} while (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED);
 
 		if (ret < 0 && gnutls_error_is_fatal(ret) == 0) {
@@ -131,7 +130,7 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 	}
 
 	for (;;) {
-		err = recvfrom(ksd, buf, MAX_BUFFER, 0, cli_addr, &cli_addr_size_tmp);
+		err = recvfrom(ksd, buf, opts->mtu, 0, cli_addr, &cli_addr_size_tmp);
 		if (err < 0) {
 			perror("recv");
 			print_error("probably not data packet, fallback to Gnu TLS");
@@ -172,11 +171,10 @@ static int dtls_run_server(struct server_opts *opts) {
 	struct sockaddr_in cli_addr;
 	socklen_t cli_addr_size;
 	gnutls_session_t session;
-	char buffer[MAX_BUFFER];
+	char buffer[opts->mtu];
 	priv_data_st priv;
 	gnutls_datum_t cookie_key;
 	gnutls_dtls_prestate_st prestate;
-	int mtu = MAX_BUFFER;
 
 	gnutls_global_init();
 
@@ -298,7 +296,7 @@ static int dtls_run_server(struct server_opts *opts) {
 		//ret = gnutls_priority_set_direct(session,
 		//			   "NORMAL:+ANON-ECDH:+ANON-DH",
 		//			   NULL);
-		ret = gnutls_priority_set_direct(session, 
+		ret = gnutls_priority_set_direct(session,
 						 "NORMAL", NULL);
 		if (ret < 0) {
 			if (ret == GNUTLS_E_INVALID_REQUEST) {
@@ -311,7 +309,7 @@ static int dtls_run_server(struct server_opts *opts) {
 				       x509_cred);
 
 		gnutls_dtls_prestate_set(session, &prestate);
-		gnutls_dtls_set_mtu(session, mtu);
+		gnutls_dtls_set_mtu(session, SERVER_MAX_MTU);
 
 		priv.session = session;
 		priv.fd = sock;
@@ -538,7 +536,7 @@ static int tls_run_server(struct server_opts *opts) {
 	char topbuf[512];
 	gnutls_session_t session;
 	gnutls_anon_server_credentials_t anoncred;
-	char buffer[MAX_BUFFER + 1];
+	char buffer[opts->mtu + 1];
 	int optval = 1;
 
 	// TODO: review printing
@@ -591,7 +589,7 @@ static int tls_run_server(struct server_opts *opts) {
 
 		sd = accept(listen_sd, (struct sockaddr *) &sa_cli, &client_len);
 
-		print_info("- connection from %s, port %d", inet_ntop(AF_INET, &sa_cli.sin_addr, topbuf, 
+		print_info("- connection from %s, port %d", inet_ntop(AF_INET, &sa_cli.sin_addr, topbuf,
 					sizeof(topbuf)), ntohs(sa_cli.sin_port));
 
 		gnutls_transport_set_int(session, sd);

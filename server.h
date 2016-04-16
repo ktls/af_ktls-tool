@@ -18,6 +18,8 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/dtls.h>
 
+#define SERVER_MAX_MTU     (1 << 14)
+
 typedef struct {
         gnutls_session_t session;
         int fd;
@@ -28,6 +30,7 @@ typedef struct {
 struct server_opts {
 	unsigned verbose_level;
 	unsigned port;
+	unsigned mtu;
 	bool tls;
 	int store_file;
 	// used to contact client on which port is server running

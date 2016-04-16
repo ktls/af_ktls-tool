@@ -31,7 +31,8 @@
 #define OPT_HELP                'h'
 #define OPT_KTLS                'k'
 #define OPT_NO_ECHO             'x'
-#define OPT_SHORT_OPTS          "tdp:vs:hx"
+#define OPT_MTU                 'm'
+#define OPT_SHORT_OPTS          "tdp:vs:hxm:"
 
 static struct option long_options[] = {
 	/* -t */{"tls",                no_argument,        0,  OPT_TLS},
@@ -40,8 +41,9 @@ static struct option long_options[] = {
 	/* -v */{"verbose",            no_argument,        0,  OPT_VERBOSE},
 	/* -s */{"store",              required_argument,  0,  OPT_STORE},
 	/* -h */{"help",               no_argument,        0,  OPT_HELP},
-	/* -h */{"ktls",               no_argument,        0,  OPT_KTLS},
+	/* -k */{"ktls",               no_argument,        0,  OPT_KTLS},
 	/* -x */{"no-echo",            no_argument,        0,  OPT_NO_ECHO},
+	/* -m */{"mtu",                required_argument,  0,  OPT_MTU},
 	{0, 0, 0, 0}
 };
 static void print_help(char *progname) {
@@ -53,9 +55,10 @@ static void print_help(char *progname) {
 		"\t--dtls|-d                    benchmark DTLS protocol; the default is TLS\n"
 		"\t--port|-p                    benchmark DTLS protocol; the default is TLS\n"
 		"\t--verbose|-v                 be verbose like an old lady at marketplace, can be used multiple times\n"
-		"\t--store FILE                 store result to file FILE\n"
-		"\t--ktls                       use AF_KTLS for communication\n"
+		"\t--store FILE|-s FILE         store result to file FILE\n"
+		"\t--ktls|-k                    use AF_KTLS for communication\n"
 		"\t--no-echo                    do not echo data messages\n"
+		"\t--mtu                        set MTU"
 		"\t--help|-h                    print this help\n\n";
 
 	assert(progname);
@@ -79,6 +82,7 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 	opts->store_file = 0;
 	opts->ktls = false;
 	opts->no_echo = false;
+	opts->mtu = SERVER_MAX_MTU;
 
 	for (;;) {
 		c = getopt_long (argc, argv, OPT_SHORT_OPTS, long_options, &idx);
@@ -110,6 +114,14 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 					return 1;
 				}
 				break;
+			case OPT_MTU:
+				opts->mtu = strtoul(optarg, &tmp_ptr, 10);
+				if (*tmp_ptr != '\0' || opts->port > SERVER_MAX_MTU) {
+					print_error("unknown mtu '%s'", optarg);
+					return 1;
+				}
+				break;
+
 			case OPT_STORE:
 				if (opts->store_file) {
 					print_error("multiple --store supplied");

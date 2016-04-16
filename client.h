@@ -52,6 +52,7 @@ struct client_opts {
 	unsigned verify;
 	const char *output;
 	bool server_no_echo;
+	unsigned server_mtu;
 };
 
 extern int do_drop_caches(void);

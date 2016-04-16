@@ -84,7 +84,8 @@
 #define OPT_OUTPUT              'o'
 #define OPT_SENDFILE_USER       0x26
 #define OPT_SERVER_NO_ECHO      0x27
-#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27"
+#define OPT_SERVER_MTU          0x28
+#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:"
 
 static int thread_server_port = 0;
 
@@ -121,6 +122,7 @@ static struct option long_options[] = {
 	/* -o   */{"output",              required_argument,  0,  OPT_OUTPUT},
 	/* -o   */{"sendfile-user",       required_argument,  0,  OPT_SENDFILE_USER},
 	/* 0x27 */{"server-no-echo",      no_argument,        0,  OPT_SERVER_NO_ECHO},
+	/* 0x28 */{"server-mtu",          required_argument,  0,  OPT_SERVER_MTU},
 	{0, 0, 0, 0}
 };
 
@@ -212,6 +214,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
+	opts->server_mtu = 0;
 
 	for (;;) {
 		c = getopt_long (argc, argv, OPT_SHORT_OPTS, long_options, &idx);
@@ -507,6 +510,13 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 		return -1;
 	}
 
+	if (opts->server_host && opts->server_mtu) {
+		print_error("--server-mtu can be used only with threaded server (no --server-host)");
+		return -1;
+	} else {
+		opts->server_mtu = SERVER_MAX_MTU;
+	}
+
 	if (opts->server_host && opts->server_store) {
 		print_error("--server-store can be used only with threaded server (no --server-host)");
 		return -1;
@@ -550,6 +560,7 @@ static void print_opts(const struct client_opts *opts) {
 		print_debug_client(opts, "server:			thread server");
 		print_debug_client(opts, "server uses AF_KTLS:	%s", opts->server_ktls ? "true" : "false");
 		print_debug_client(opts, "server lib:			Gnu TLS");
+		print_debug_client(opts, "server mtu:			%u", opts->server_mtu);
 	} else
 		print_debug_client(opts, "destination host:		%s", opts->server_host);
 	print_debug_client(opts, "drop caches:		%s", opts->drop_caches ? "true" : "false");
@@ -865,6 +876,7 @@ static void client_opts2server_opts(const struct client_opts *client_opts,
 	server_opts->condition_initialized = condition_server_initialized;
 	server_opts->ktls = client_opts->server_ktls;
 	server_opts->no_echo = client_opts->server_no_echo;
+	server_opts->mtu = client_opts->server_mtu;
 }
 
 int main(int argc, char *argv[]) {
