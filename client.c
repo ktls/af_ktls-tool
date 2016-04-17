@@ -85,7 +85,7 @@
 #define OPT_SENDFILE_USER       0x26
 #define OPT_SERVER_NO_ECHO      0x27
 #define OPT_SERVER_MTU          0x28
-#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:"
+#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:"
 
 static int thread_server_port = 0;
 
@@ -103,7 +103,7 @@ static struct option long_options[] = {
 	/* -m   */{"sendfile-mtu",        required_argument,  0,  OPT_SENDFILE_MTU},
 	/* -v   */{"verbose",             no_argument,        0,  OPT_VERBOSE},
 	/* -h   */{"help",                no_argument,        0,  OPT_HELP},
-	/* 0x0E */{"sendfile-mmap",       no_argument,        0,  OPT_SENDFILE_MMAP},
+	/* 0x0E */{"sendfile-mmap",       required_argument,  0,  OPT_SENDFILE_MMAP},
 	/* 0x0F */{"send-ktls-time",      required_argument,  0,  OPT_SEND_KTLS_TIME},
 	/* 0x10 */{"send-gnutls-time",    required_argument,  0,  OPT_SEND_GNUTLS_TIME},
 	/* 0x11 */{"splice-time",         required_argument,  0,  OPT_SPLICE_TIME},
@@ -198,7 +198,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->send_ktls_time = 0;
 	opts->send_gnutls_time = 0;
 	opts->splice_time = 0;
-	opts->sendfile_mmap = false;
+	opts->sendfile_mmap = NULL;
 	opts->sendfile_size = 0;
 	opts->server_host = NULL;
 	opts->server_store = 0;
@@ -315,7 +315,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 				return -1;
 				break;
 			case OPT_SENDFILE_MMAP:
-				opts->sendfile_mmap = true;
+				opts->sendfile_mmap = optarg;
 				break;
 			case OPT_SEND_KTLS_TIME:
 				if (opts->send_ktls_time) {
@@ -465,6 +465,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->splice_echo_count &&
 			!opts->splice_echo_time &&
 			!opts->splice_time &&
+			!opts->sendfile_mmap &&
 			!opts->sendfile_user) {
 		if (!opts->verify) {
 			print_error("specify at least one benchamrking or verification option");
@@ -490,13 +491,14 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 		return -1;
 	}
 
-	if (opts->sendfile_mtu && !opts->sendfile && !opts->sendfile_user && !opts->splice_echo_count && !opts->splice_echo_time) {
-		print_error("--sendfile-mtu can be used only with --sendfile or --sendfile-user");
+	if (opts->sendfile_mmap && !opts->sendfile_mtu) {
+		print_error("--sendfile-mmap requires MTU specified with --sendfile-mtu");
 		return -1;
 	}
 
-	if (opts->sendfile_mmap && !opts->sendfile && !opts->sendfile_user) {
-		print_error("--sendfile-mmap can be used only with --sendfile or --sendfile-user");
+	if (opts->sendfile_mtu && !opts->sendfile && !opts->sendfile_user && !opts->splice_echo_count && !opts->splice_echo_time && !opts->sendfile_mtu) {
+		print_error("--sendfile-mtu can be used only with --sendfile "
+				    "--sendfile_mmap, --sendfile-user, --splice_echo_time, --splice_echo_time");
 		return -1;
 	}
 
@@ -584,9 +586,10 @@ static void print_opts(const struct client_opts *opts) {
 			print_debug_client(opts, "sendfile(2) MTU:		%u", opts->sendfile_mtu);
 		else
 			print_debug_client(opts, "sendfile(2) MTU:		max");
-		if (opts->sendfile_mmap)
-			print_debug_client(opts, "sendfile(2) will mmap(2) file");
 	}
+
+	if (opts->sendfile_mmap)
+		print_debug_client(opts, "mmap(2) send file %s", opts->sendfile_mmap);
 	print_debug_client(opts, "output type:		%s", opts->json ? "JSON" : "text");
 	if (opts->server_store)
 		print_debug_client(opts, "server store file (fd):		'%s'", opts->server_store);
@@ -678,6 +681,14 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = do_sendfile_user(opts, session);
 		if (err < 0) {
 			print_error("failed to do Gnu TLS send file with user space buffer");
+			goto action_error;
+		}
+	}
+
+	if (opts->sendfile_mmap) {
+		err = do_sendfile_mmap(opts, session);
+		if (err < 0) {
+			print_error("failed to do Gnu TLS send file with mmap(2)");
 			goto action_error;
 		}
 	}

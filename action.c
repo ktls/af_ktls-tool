@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 
 #include <errno.h>
@@ -33,6 +34,8 @@
 #include "client.h"
 
 #include "action.h"
+
+#define MIN(A, B)	((A) < (B) ? (A) : (B))
 
 static void print_send_count_stats(const struct client_opts *opts, bool gnutls, size_t total_sent, size_t total_recv, double clocks) {
 	const char *json_msg = \
@@ -148,6 +151,40 @@ static void print_splice_time_stats(const struct client_opts *opts, size_t total
 	print_stats(msg, opts->payload_size, total_sent, total_recv, elapsed);
 }
 
+static void print_sendfile_mmap_stats(const struct client_opts *opts, size_t filesize, size_t total_sent, double clocks) {
+	const char *json_msg = \
+		"  {\n"
+		"    \"test\": \"sendfile mmap(2)\",\n"
+		"    \"type\": \"time\",\n"
+		"    \"configuration\": {\n"
+		"      \"file\": \"%s\",\n"
+		"      \"file-size\": %lu,\n"
+		"      \"mtu\": %lu\n"
+		"    },\n"
+		"    \"result\": {\n"
+		"      \"sent\": %lu,\n"
+		"      \"received\": 0,\n"
+		"      \"elapsed\": %g\n"
+		"    }\n"
+		"  }";
+	const char *txt_msg = \
+		"file:  '%s'\n"
+		"file size:             %lu\n"
+		"total bytes sent:      %lu\n"
+		"CPU clock time:        %0.4g\n";
+
+	if (opts->json)
+		print_stats(json_msg,
+				opts->sendfile_mmap,
+				filesize,
+				opts->sendfile_mtu,
+				total_sent,
+				clocks);
+	else
+		print_stats(txt_msg, opts->sendfile_mmap, filesize, total_sent, clocks);
+}
+
+
 static void print_sendfile_user_stats(const struct client_opts *opts, size_t filesize, size_t total_sent, double clocks) {
 	const char *json_msg = \
 		"  {\n"
@@ -156,8 +193,7 @@ static void print_sendfile_user_stats(const struct client_opts *opts, size_t fil
 		"    \"configuration\": {\n"
 		"      \"file\": \"%s\",\n"
 		"      \"file-size\": %lu,\n"
-		"      \"mtu\": %lu,\n"
-		"      \"mmap\": %s\n"
+		"      \"mtu\": %lu\n"
 		"    },\n"
 		"    \"result\": {\n"
 		"      \"sent\": %lu,\n"
@@ -176,7 +212,6 @@ static void print_sendfile_user_stats(const struct client_opts *opts, size_t fil
 				opts->sendfile_user,
 				filesize,
 				opts->sendfile_mtu,
-				opts->sendfile_mmap ? "true" : "false",
 				total_sent,
 				clocks);
 	else
@@ -191,8 +226,7 @@ static void print_sendfile_stats(const struct client_opts *opts, size_t filesize
 		"    \"configuration\": {\n"
 		"      \"file\": \"%s\",\n"
 		"      \"file-size\": %lu,\n"
-		"      \"mtu\": %lu,\n"
-		"      \"mmap\": %s\n"
+		"      \"mtu\": %lu\n"
 		"    },\n"
 		"    \"result\": {\n"
 		"      \"sent\": %lu,\n"
@@ -211,7 +245,6 @@ static void print_sendfile_stats(const struct client_opts *opts, size_t filesize
 				opts->sendfile,
 				filesize,
 				opts->sendfile_mtu,
-				opts->sendfile_mmap ? "true" : "false",
 				total_sent,
 				clocks);
 	else
@@ -687,6 +720,66 @@ out:
 	return err;
 }
 
+extern int do_sendfile_mmap(const struct client_opts *opts, gnutls_session_t session) {
+	int err;
+	int in_fd = 0;
+	clock_t start, end;
+	ssize_t total = 0;
+	ssize_t filesize;
+	char *buf = NULL;
+
+	in_fd = open(opts->sendfile_mmap, O_RDONLY);
+	if (in_fd < 0) {
+		perror("open");
+		goto out;
+	}
+
+	if (opts->sendfile_size == 0) {
+		filesize = lseek(in_fd, 0L, SEEK_END);
+		if (filesize < 0) {
+			perror("lseek() to EOF");
+			err = filesize;
+			goto out;
+		}
+		err = lseek(in_fd, 0L, SEEK_SET);
+		if (err < 0) {
+			perror("lseek() to beginning");
+			goto out;
+		}
+	} else {
+		filesize = opts->sendfile_size;
+	}
+
+	// we explicitly drop caches since we used seek
+	DO_DROP_CACHES(opts);
+
+	start = clock();
+
+	buf = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, in_fd, /*offset*/ 0);
+	if (buf == MAP_FAILED) {
+		perror("mmap");
+		goto out;
+	}
+
+	for (total = 0; total != filesize; total += err) {
+		err = gnutls_record_send(session, buf + total, MIN(opts->sendfile_mtu, filesize - total));
+		if (err < 0) {
+			print_error("failed to send via Gnu TLS");
+			goto out;
+		}
+	}
+
+	end = clock();
+
+	print_sendfile_mmap_stats(opts, filesize, total, ((double) (end - start)) / CLOCKS_PER_SEC);
+
+out:
+	if (in_fd > 0)
+		close(in_fd);
+
+	return err;
+}
+
 extern int do_sendfile_user(const struct client_opts *opts, gnutls_session_t session) {
 	int err;
 	int in_fd = 0;
@@ -717,9 +810,6 @@ extern int do_sendfile_user(const struct client_opts *opts, gnutls_session_t ses
 	} else {
 		filesize = opts->sendfile_size;
 	}
-
-	if (opts->sendfile_mmap)
-		print_warning("mmap(2) not implemented");
 
 	close(in_fd);
 
@@ -810,9 +900,6 @@ extern int do_sendfile(const struct client_opts *opts, int ksd) {
 
 	// we do it explicitly because of lseek()
 	DO_DROP_CACHES(opts);
-
-	if (opts->sendfile_mmap)
-		print_warning("mmap(2) not implemented");
 
 	start = clock();
 	total = sendfile(ksd, fd, &offset, filesize);
