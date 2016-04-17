@@ -459,7 +459,7 @@ extern int do_splice_count(const struct client_opts *opts, int ksd) {
 	int err;
 	int ret;
 	int fd_f;
-	int p[2];
+	int p[2] = {0, 0};
 	clock_t start, end;
 	size_t total_sent = 0;
 	size_t total_recv = 0; // not used now
