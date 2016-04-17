@@ -458,7 +458,7 @@ extern int do_gnutls_send_time(const struct client_opts *opts, gnutls_session_t 
 extern int do_splice_count(const struct client_opts *opts, int ksd) {
 	int err;
 	int ret;
-	int fd_f;
+	int fd_f = 0;
 	int p[2] = {0, 0};
 	clock_t start, end;
 	size_t total_sent = 0;
@@ -510,9 +510,12 @@ extern int do_splice_count(const struct client_opts *opts, int ksd) {
 	print_splice_count_stats(opts, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
 
 out:
-	close(p[0]);
-	close(p[1]);
-	close(fd_f);
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
+	if (fd_f > 0)
+		close(fd_f);
 
 	return err;
 }
@@ -520,8 +523,8 @@ out:
 extern int do_splice_time(const struct client_opts *opts, int ksd) {
 	int err;
 	int ret;
-	int fd_f;
-	int p[2];
+	int fd_f = 0;
+	int p[2] = {0, 0};
 	size_t total_sent = 0;
 	size_t total_recv = 0; // unused now
 	unsigned long elapsed;
@@ -583,9 +586,12 @@ out:
 	if (ret < 0)
 		print_error("failed to stop timer");
 
-	close(p[0]);
-	close(p[1]);
-	close(fd_f);
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
+	if (fd_f > 0)
+		close(fd_f);
 
 	return err;
 }
@@ -593,7 +599,7 @@ out:
 extern int do_splice_echo_time(const struct client_opts *opts, int ksd, void *mem) {
 	int err;
 	int ret;
-	int p[2];
+	int p[2] = {0, 0};
 	size_t total_recv, total_sent;
 	unsigned long elapsed;
 	struct benchmark_st bst;
@@ -658,15 +664,17 @@ out:
 	if (ret < 0)
 		print_error("failed to stop timer");
 
-	close(p[0]);
-	close(p[1]);
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
 
 	return err;
 }
 
 extern int do_splice_echo_count(const struct client_opts *opts, int ksd, void *mem) {
 	int err;
-	int p[2];
+	int p[2] = {0, 0};
 	clock_t start, end;
 	size_t total_recv, total_sent;
 
@@ -713,10 +721,12 @@ extern int do_splice_echo_count(const struct client_opts *opts, int ksd, void *m
 	if (err > 0)
 		print_splice_echo_count_stats(opts, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
 
-	close(p[0]);
-	close(p[1]);
-
 out:
+
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
 	return err;
 }
 
@@ -774,6 +784,8 @@ extern int do_sendfile_mmap(const struct client_opts *opts, gnutls_session_t ses
 	print_sendfile_mmap_stats(opts, filesize, total, ((double) (end - start)) / CLOCKS_PER_SEC);
 
 out:
+	if (buf)
+		munmap(buf, filesize);
 	if (in_fd > 0)
 		close(in_fd);
 
@@ -850,14 +862,11 @@ extern int do_sendfile_user(const struct client_opts *opts, gnutls_session_t ses
 		total += err;
 	} while (total != filesize && err != 0);
 
-	close(in_fd);
-
 	end = clock();
 
 	print_sendfile_user_stats(opts, filesize, total, ((double) (end - start)) / CLOCKS_PER_SEC);
 
-	err = 0;
-	in_fd = 0;
+	err = total;
 
 do_sendfile_user_end:
 	if (buf)
@@ -912,5 +921,4 @@ extern int do_sendfile(const struct client_opts *opts, int ksd) {
 
 	return total;
 }
-
 
