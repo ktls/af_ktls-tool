@@ -80,6 +80,7 @@ for protocol in "--tls" "--dtls"; do
 				run_server "${protocol}" --no-echo
 				run_client "${protocol}" --sendfile "${file}" --sendfile-mtu ${SENDFILE_MTU} \
 					--sendfile-user ${file} --payload ${payload} \
+					--sendfile-mmap ${file}  \
 					--output "${TEST_OUTPUT_DIR}/output.${i}.json"
 				stop_server
 			done
