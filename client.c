@@ -629,7 +629,7 @@ extern int do_drop_caches(void) {
 		return fd;
 	}
 
-	ret = write(fd, "1", 1);
+	ret = write(fd, "3", 1);
 	if (ret < 0) {
 		perror("write:failed to drop caches");
 		return ret;
