@@ -675,6 +675,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 			print_error("failed to do Gnu TLS gnutls_record_send()");
 			goto action_error;
 		}
+		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->sendfile_user) {
@@ -683,6 +684,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 			print_error("failed to do Gnu TLS send file with user space buffer");
 			goto action_error;
 		}
+		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->sendfile_mmap) {
@@ -691,6 +693,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 			print_error("failed to do Gnu TLS send file with mmap(2)");
 			goto action_error;
 		}
+		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->send_ktls_count || opts->sendfile || opts->splice_count
