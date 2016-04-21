@@ -85,7 +85,8 @@
 #define OPT_SENDFILE_USER       0x26
 #define OPT_SERVER_NO_ECHO      0x27
 #define OPT_SERVER_MTU          0x28
-#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:"
+#define OPT_RAW_SEND_TIME       0x29
+#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:"
 
 static int thread_server_port = 0;
 
@@ -123,6 +124,7 @@ static struct option long_options[] = {
 	/* -o   */{"sendfile-user",       required_argument,  0,  OPT_SENDFILE_USER},
 	/* 0x27 */{"server-no-echo",      no_argument,        0,  OPT_SERVER_NO_ECHO},
 	/* 0x28 */{"server-mtu",          required_argument,  0,  OPT_SERVER_MTU},
+	/* 0x29 */{"raw-send-time",       required_argument,  0,  OPT_RAW_SEND_TIME},
 	{0, 0, 0, 0}
 };
 
@@ -150,13 +152,14 @@ static void print_help(char *progname) {
 		"\n"
 		"\t--sendfile FILE              perform sendfile(2) using AF_KTLS, send file FILE\n"
 		"\t--sendfile-mtu SIZE|-m SIZE  specify sendfile(2) MTU\n"
-		"\t--sendfile-mmap              mmap(2) file FILE before sendfile(2)\n"
-		"\t--sendfile-size              specify size of FILE for sendfile(2); otherwise the whole file is sent\n"
+		"\t--sendfile-mmap FILE         mmap(2) file FILE before sendfile(2)\n"
+		"\t--sendfile-size SIZE         specify size of FILE for sendfile(2); otherwise the whole file is sent\n"
 		"\n"
 		"\t--send-ktls-count COUNT      perform send(2) with zero content using AF_KTLS COUNT times\n"
 		"\t--send-ktls-time TIME        perform send(2) with zero content using AF_KTLS TIME secs\n"
 		"\t--send-gnutls-count COUNT    perform send(2) with zero content using Gnu TLS COUNT times\n"
 		"\t--send-gnutls-time TIME      perform send(2) with zero content using Gnu TLS TIME secs\n"
+		"\t--raw-send-time TIME         send raw to server, server will return encrypted\n"
 		"\n"
 		"\t--splice-count COUNT         perform splice(2) COUNT times\n"
 		"\t--splice-time TIME           perform splice(2) TIME secs\n"
@@ -211,6 +214,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->output = NULL;
 	opts->sendfile_user = NULL;
 	opts->server_no_echo = false;
+	opts->raw_send_time = 0;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -401,6 +405,17 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 					return -1;
 				}
 				break;
+			case OPT_RAW_SEND_TIME:
+				if (opts->raw_send_time) {
+					print_error("multiple --raw-send-send supplied");
+					return -1;
+				}
+				opts->raw_send_time = strtoul(optarg, &tmp_ptr, 10);
+				if (*tmp_ptr != '\0' || opts->raw_send_time == 0) {
+					print_error("unknown raw send time '%s'", optarg);
+					return -1;
+				}
+				break;
 			case OPT_SERVER_NO_ECHO:
 				opts->server_no_echo = true;
 				break;
@@ -466,7 +481,8 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->splice_echo_time &&
 			!opts->splice_time &&
 			!opts->sendfile_mmap &&
-			!opts->sendfile_user) {
+			!opts->sendfile_user &&
+			!opts->raw_send_time) {
 		if (!opts->verify) {
 			print_error("specify at least one benchamrking or verification option");
 			return -1;
@@ -476,8 +492,26 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			print_error("output file stores results of benchmarks, nothing to store");
 			return -1;
 		}
+
 	} else if (opts->verify) {
 		print_error("to verify implementation, run only verification without benchnarking options");
+		return -1;
+	}
+
+	if ((opts->sendfile ||
+			opts->send_gnutls_count ||
+			opts->send_ktls_count ||
+			opts->splice_count ||
+			opts->send_gnutls_time ||
+			opts->send_ktls_time ||
+			opts->splice_echo_count ||
+			opts->splice_echo_time ||
+			opts->splice_time ||
+			opts->sendfile_mmap ||
+			opts->sendfile_user ||
+			opts->verify) &&
+			opts->raw_send_time) {
+		print_error("raw send can be run only as a standalone test");
 		return -1;
 	}
 
@@ -591,6 +625,8 @@ static void print_opts(const struct client_opts *opts) {
 	if (opts->sendfile_mmap)
 		print_debug_client(opts, "mmap(2) send file %s", opts->sendfile_mmap);
 	print_debug_client(opts, "output type:		%s", opts->json ? "JSON" : "text");
+	if (opts->raw_send_time)
+		print_debug_client(opts, "raw send time: %d", opts->raw_send_time);
 	if (opts->server_store)
 		print_debug_client(opts, "server store file (fd):		'%s'", opts->server_store);
 	if (opts->sendfile)
@@ -649,7 +685,8 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 
 	if (opts->send_ktls_count || opts->send_gnutls_count ||
 			opts->send_ktls_time || opts->send_gnutls_time ||
-			opts->splice_echo_time || opts->splice_echo_count) {
+			opts->splice_echo_time || opts->splice_echo_count ||
+			opts->raw_send_time) {
 		err = posix_memalign((void **) &mem, 16, opts->payload_size);
 		memset(mem, 0, opts->payload_size);
 		if (err) {
@@ -703,6 +740,15 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		if (ksd < 0) {
 			print_error("failed to get AF_KTLS socket");
 			goto action_error;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
+	if (opts->raw_send_time) {
+		err = do_raw_send_time(opts, session, udp_sd, mem);
+		if (err < 0) {
+			print_error("failed to do raw send");
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -891,6 +937,7 @@ static void client_opts2server_opts(const struct client_opts *client_opts,
 	server_opts->ktls = client_opts->server_ktls;
 	server_opts->no_echo = client_opts->server_no_echo;
 	server_opts->mtu = client_opts->server_mtu;
+	server_opts->raw_recv = client_opts->raw_send_time > 0;
 }
 
 int main(int argc, char *argv[]) {

@@ -32,6 +32,7 @@
 #define OPT_KTLS                'k'
 #define OPT_NO_ECHO             'x'
 #define OPT_MTU                 'm'
+#define OPT_RAW_RECV            'r'
 #define OPT_SHORT_OPTS          "tdp:vs:hxm:"
 
 static struct option long_options[] = {
@@ -44,6 +45,7 @@ static struct option long_options[] = {
 	/* -k */{"ktls",               no_argument,        0,  OPT_KTLS},
 	/* -x */{"no-echo",            no_argument,        0,  OPT_NO_ECHO},
 	/* -m */{"mtu",                required_argument,  0,  OPT_MTU},
+	/* -r */{"raw-recv",           no_argument,        0,  OPT_RAW_RECV},
 	{0, 0, 0, 0}
 };
 static void print_help(char *progname) {
@@ -58,6 +60,7 @@ static void print_help(char *progname) {
 		"\t--store FILE|-s FILE         store result to file FILE\n"
 		"\t--ktls|-k                    use AF_KTLS for communication\n"
 		"\t--no-echo                    do not echo data messages\n"
+		"\t--raw_recv                   expect unencrypted data\n"
 		"\t--mtu                        set MTU"
 		"\t--help|-h                    print this help\n\n";
 
@@ -82,6 +85,7 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 	opts->store_file = 0;
 	opts->ktls = false;
 	opts->no_echo = false;
+	opts->raw_recv = false;
 	opts->mtu = SERVER_MAX_MTU;
 
 	for (;;) {
@@ -139,6 +143,9 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 				break;
 			case OPT_KTLS:
 				opts->ktls = true;
+				break;
+			case OPT_RAW_RECV:
+				opts->raw_recv = true;
 				break;
 			case OPT_NO_ECHO:
 				opts->no_echo = true;

@@ -39,6 +39,7 @@ struct server_opts {
 	pthread_cond_t *condition_initialized;
 	bool ktls;
 	bool no_echo;
+	bool raw_recv;
 };
 
 extern int server_err;

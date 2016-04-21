@@ -53,6 +53,7 @@ struct client_opts {
 	const char *output;
 	bool server_no_echo;
 	unsigned server_mtu;
+	unsigned raw_send_time;
 };
 
 extern int do_drop_caches(void);

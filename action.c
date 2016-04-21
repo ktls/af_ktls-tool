@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include <sys/sendfile.h>
 #include <sys/stat.h>
@@ -95,6 +96,34 @@ static void print_send_time_stats(const struct client_opts *opts, bool gnutls, s
 	const size_t time = gnutls ? opts->send_gnutls_time : opts->send_ktls_time;
 
 	print_stats(msg, name, opts->payload_size, time, total_sent, total_recv, elapsed);
+}
+
+static void print_raw_send_time_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, double elapsed) {
+	const char *json_msg = \
+		"  {\n"
+		"    \"test\": \"raw send, enc recv\",\n"
+		"    \"type\": \"time\",\n"
+		"    \"configuration\": {\n"
+		"      \"size\": %lu,\n"
+		"      \"time\": %u\n"
+		"    },\n"
+		"    \"result\": {\n"
+		"      \"sent\": %lu,\n"
+		"      \"received\": %lu,\n"
+		"      \"elapsed\": %g\n"
+		"    }\n"
+		"  }";
+	const char *txt_msg = \
+		"statistics for raw senc, enc recv:\n"
+		"data size in packet:   %lu\n"
+		"number of seconds:     %lu\n"
+		"total bytes sent:      %lu\n"
+		"total bytes received:  %lu\n"
+		"elapsed time:          %g\n";
+
+	const char *msg = opts->json ? json_msg : txt_msg;
+
+	print_stats(msg, opts->payload_size, opts->raw_send_time, total_sent, total_recv, elapsed);
 }
 
 static void print_splice_count_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, double clocks) {
@@ -790,6 +819,60 @@ out:
 		close(in_fd);
 
 	return err;
+}
+
+extern int do_raw_send_time(const struct client_opts *opts, gnutls_session_t session, int raw_sd, void *mem) {
+	int err;
+	long unsigned elapsed;
+	register int ret;
+	register size_t total_recv = 0;
+	register size_t total_sent = 0;
+	struct benchmark_st bst;
+
+	assert(raw_sd > 0);
+
+	memset(&bst, 0, sizeof(bst));
+
+	// initial send
+	ret = send(raw_sd, mem, opts->payload_size, 0);
+	if (ret < 0) {
+		gnutls_perror(ret);
+		print_error("failed to do initial send");
+		return -1;
+	}
+
+	ret = start_benchmark(&bst, opts->raw_send_time);
+	if (ret < 0) {
+		print_error("failed to set up timer");
+		return -1;
+	}
+
+	do {
+		ret = gnutls_record_recv(session, mem, opts->payload_size);
+		if (ret < 0) {
+			gnutls_perror(ret);
+			print_error("failed to do gnutls_record_recv");
+			break;
+		}
+		total_recv += ret;
+
+		ret = send(raw_sd, mem, opts->payload_size, 0);
+		if (ret < 0) {
+			gnutls_perror(ret);
+			break;
+		}
+		total_sent += ret;
+	} while(benchmark_must_finish == 0 && ret > 0);
+
+	if (ret > 0) {
+		err = stop_benchmark(&bst, &elapsed);
+
+		print_raw_send_time_stats(opts, total_sent, total_recv, (double) elapsed / 1000);
+		if (err < 0)
+			print_error("failed to stop timer");
+	}
+
+	return ret < 0 ? ret : total_sent;
 }
 
 extern int do_sendfile_user(const struct client_opts *opts, gnutls_session_t session) {

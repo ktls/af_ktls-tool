@@ -71,6 +71,7 @@ for protocol in "--tls" "--dtls"; do
 				SENDFILE_MTU=$(( ${payload} + ${DTLS_OVERHEAD} ))
 			fi
 
+
 			########## sendfile(2) vs userspace buffered copy
 			for file in "${FILE_100KB}" "${FILE_1MB}" "${FILE_100MB}" "${FILE_500MB}"; do
 				TEST_OUTPUT_DIR="${OUTPUT_DIR}/sendfile-${file}-${payload}${protocol}"
@@ -89,7 +90,6 @@ for protocol in "--tls" "--dtls"; do
 			TEST_OUTPUT_DIR="${OUTPUT_DIR}/transmission-count-${BENCH_COUNT}-${payload}${protocol}"
 			xecho "Performing benchmark, output ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
-
 			run_server "${protocol}"
 			run_client "${protocol}" --send-ktls-count "${BENCH_COUNT}" --payload ${payload} \
 				--output "${TEST_OUTPUT_DIR}/ktls-output.${i}.json"
@@ -138,6 +138,15 @@ for protocol in "--tls" "--dtls"; do
 			run_server "${protocol}" --no-echo
 			run_client "${protocol}" --splice-time "${BENCH_TIME}" --payload ${payload} \
 				--splice-file /dev/zero --output "${TEST_OUTPUT_DIR}/output.${i}.json"
+			stop_server
+
+			########## raw send & encrypt recv - openconnect emulation
+			TEST_OUTPUT_DIR="${OUTPUT_DIR}/raw-send-time-${BENCH_TIME}-${payload}${protocol}"
+			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
+			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
+			run_server "${protocol}"
+			run_client "${protocol}" --raw-send-time "${BENCH_TIME}" --payload ${payload} \
+				--output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
 
 			########### splice(2) echo -- "ping-pong" - TIME

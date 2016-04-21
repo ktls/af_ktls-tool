@@ -68,21 +68,33 @@ static gnutls_certificate_credentials_t x509_cred;
 static gnutls_dh_params_t dh_params;
 
 
-static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t session, char *buffer) {
+static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t session,
+								char *buffer, int sd) {
 	int ret;
 	unsigned char sequence[8];
 
 	for (;;) {
-		do {
-			ret = gnutls_record_recv_seq(session, buffer, opts->mtu, sequence);
-		} while (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED);
+		if (!opts->raw_recv) {
+			do {
+				ret = gnutls_record_recv_seq(session, buffer, opts->mtu, sequence);
+			} while (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED);
+		} else {
+			ret = recv(sd, buffer, opts->mtu, 0);
+			if (ret < 0) {
+				perror("recv");
+				print_error("failed to recv");
+				break;
+			}
+		}
 
-		if (ret < 0 && gnutls_error_is_fatal(ret) == 0) {
-			print_warning("*** Warning: %s", gnutls_strerror(ret));
-			continue;
-		} else if (ret < 0) {
-			print_error("Error in recv(): %s", gnutls_strerror(ret));
-			break;
+		if (!opts->raw_recv) {
+			if (ret < 0 && gnutls_error_is_fatal(ret) == 0) {
+				print_warning("*** Warning: %s", gnutls_strerror(ret));
+				continue;
+			} else if (ret < 0) {
+				print_error("Error in recv(): %s", gnutls_strerror(ret));
+				break;
+			}
 		}
 
 		if (ret == 0) {
@@ -105,8 +117,14 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 		if (!opts->no_echo) {
 			ret = gnutls_record_send(session, buffer, ret);
 			if (ret < 0) {
-				print_error("Error in send(): %s",
-					gnutls_strerror(ret));
+				// if we do raw recv, just ignore recv errors, since recv channel is tainted,
+				// this handling is OK for benchmark tests
+				if (!opts->raw_recv) {
+					print_error("Error in send(): %s",
+						gnutls_strerror(ret));
+				} else {
+					ret = 0;
+				}
 				break;
 			}
 		}
@@ -134,7 +152,7 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 		if (err < 0) {
 			perror("recv");
 			print_error("probably not data packet, fallback to Gnu TLS");
-			err = server_gnutls_loop(opts, session, buf);
+			err = server_gnutls_loop(opts, session, buf, sd);
 			goto ktls_loop_end;
 		}
 
@@ -343,7 +361,7 @@ static int dtls_run_server(struct server_opts *opts) {
 		if (opts->ktls) {
 			server_ktls_loop(opts, session, sock, (struct sockaddr *)&cli_addr, sizeof(cli_addr), buffer);
 		} else {
-			server_gnutls_loop(opts, session, buffer);
+			server_gnutls_loop(opts, session, buffer, sock);
 		}
 
 		gnutls_bye(session, GNUTLS_SHUT_WR);
@@ -612,7 +630,7 @@ static int tls_run_server(struct server_opts *opts) {
 		if (opts->ktls) {
 			server_ktls_loop(opts, session, sd, (struct sockaddr *)&sa_cli, sizeof(sa_cli), buffer);
 		} else {
-			server_gnutls_loop(opts, session, buffer);
+			server_gnutls_loop(opts, session, buffer, sd);
 		}
 
 		/* do not wait for the peer to close the connection.
