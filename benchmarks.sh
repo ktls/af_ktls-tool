@@ -140,11 +140,11 @@ for protocol in "--tls" "--dtls"; do
 				--splice-file /dev/zero --output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
 
-			########## raw send & encrypt recv - openconnect emulation
+			########## raw send & encrypt recv - openconnect and haproxy emulation
 			TEST_OUTPUT_DIR="${OUTPUT_DIR}/raw-send-time-${BENCH_TIME}-${payload}${protocol}"
 			xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
 			[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
-			run_server "${protocol}"
+			run_server "${protocol}" --raw-recv
 			run_client "${protocol}" --raw-send-time "${BENCH_TIME}" --payload ${payload} \
 				--output "${TEST_OUTPUT_DIR}/output.${i}.json"
 			stop_server
