@@ -31,7 +31,7 @@ extern int xlibgnutls_dtls_handshake(gnutls_session_t *session, int udp_sd, unsi
 	const char *CAFILE = "ca-cert.pem"; // TODO: use anoncred
 	int ret;
 	const char *err;
-	
+
 	if (gnutls_check_version("3.1.4") == NULL) {
 		print_error("GnuTLS 3.1.4 or later is required");
 		return -1;
@@ -54,7 +54,7 @@ extern int xlibgnutls_dtls_handshake(gnutls_session_t *session, int udp_sd, unsi
 
 	/* Initialize TLS session */
 	gnutls_init(session, GNUTLS_CLIENT | GNUTLS_DATAGRAM);
-	
+
 	/* put the x509 credentials to the current session */
 	gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, xcred);
 	gnutls_server_name_set(*session, GNUTLS_NAME_DNS, "my_host_name", strlen("my_host_name"));

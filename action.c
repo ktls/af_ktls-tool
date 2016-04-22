@@ -310,6 +310,39 @@ static void print_splice_echo_time_stats(const struct client_opts *opts, size_t 
 		print_stats(txt_msg, opts->payload_size, total_sent, total_recv, clocks);
 }
 
+static void print_splice_send_raw_time_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, double clocks) {
+	const char *json_msg = \
+		"  {\n"
+		"    \"test\": \"splice(2) raw send\",\n"
+		"    \"type\": \"time\",\n"
+		"    \"configuration\": {\n"
+		"      \"size\": \"%u\",\n"
+		"      \"sendfile mtu\": \"%u\"\n"
+		"    },\n"
+		"    \"result\": {\n"
+		"      \"sent\": %lu,\n"
+		"      \"received\": %lu,\n"
+		"      \"elapsed\": %g\n"
+		"    }\n"
+		"  }";
+	const char *txt_msg = \
+		"payload:               %lu\n"
+		"sendfile mtu:                   %lu\n"
+		"total bytes sent:      %lu\n"
+		"total bytes received:  %lu\n"
+		"CPU clock time:        %0.4g\n";
+
+	if (opts->json)
+		print_stats(json_msg,
+				opts->payload_size,
+				opts->sendfile_mtu,
+				total_sent,
+				total_recv,
+				clocks);
+	else
+		print_stats(txt_msg, opts->payload_size, total_sent, total_recv, clocks);
+}
+
 static void print_splice_echo_count_stats(const struct client_opts *opts, size_t total_sent, size_t total_recv, double clocks) {
 	const char *json_msg = \
 		"  {\n"
@@ -548,6 +581,86 @@ out:
 
 	return err;
 }
+
+
+extern int do_splice_send_raw_time(const struct client_opts *opts, int raw_sd, int ksd, void *mem) {
+	int err;
+	int ret;
+	int p[2] = {0, 0};
+	size_t total_recv, total_sent;
+	unsigned long elapsed;
+	struct benchmark_st bst;
+
+	memset(&bst, 0, sizeof(bst));
+
+	err = pipe(p);
+	if (err) {
+		perror("pipe");
+		return err;
+	}
+
+	// do initial send
+	err = send(raw_sd, mem, opts->payload_size, 0);
+	if (err < 0) {
+		perror("send");
+		print_error("failed to do send");
+		return err;
+	}
+
+	if (err != opts->payload_size)
+		print_warning("send %u, send() returned %d", opts->payload_size, err);
+
+	total_recv = 0;
+	total_sent = 0;
+
+	ret = start_benchmark(&bst, opts->splice_send_raw_time);
+	if (ret < 0) {
+		print_error("failed to set up timer");
+		return -1;
+	}
+
+	do {
+		err = splice(ksd, NULL, p[1], NULL, opts->payload_size, 0);
+		if (err < 0) {
+			perror("splice");
+			print_error("failed to do splice(2)");
+			goto out;
+		}
+		if (err == 0)
+			break;
+
+		total_recv += err;
+
+		err = splice(p[0], NULL, raw_sd, NULL, opts->payload_size, 0);
+		if (err < 0) {
+			perror("splice");
+			print_error("failed to do splice(2)");
+			goto out;
+		}
+
+		if (err == 0)
+			break;
+
+		total_sent += err;
+
+	} while(benchmark_must_finish == 0);
+
+out:
+	ret = stop_benchmark(&bst, &elapsed);
+	if (!ret)
+		print_splice_send_raw_time_stats(opts, total_sent, total_recv, (double) elapsed / 1000);
+
+	if (ret < 0)
+		print_error("failed to stop timer");
+
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
+
+	return err;
+}
+
 
 extern int do_splice_time(const struct client_opts *opts, int ksd) {
 	int err;

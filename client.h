@@ -54,6 +54,7 @@ struct client_opts {
 	bool server_no_echo;
 	unsigned server_mtu;
 	unsigned raw_send_time;
+	unsigned splice_send_raw_time;
 };
 
 extern int do_drop_caches(void);

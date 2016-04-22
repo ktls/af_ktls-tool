@@ -26,5 +26,6 @@ extern int do_sendfile_mmap(const struct client_opts *opts, gnutls_session_t ses
 extern int do_sendfile_user(const struct client_opts *opts, gnutls_session_t session);
 extern int do_sendfile(const struct client_opts *opts, int ksd);
 extern int do_raw_send_time(const struct client_opts *opts, gnutls_session_t session, int raw_sd, void *mem);
+extern int do_splice_send_raw_time(const struct client_opts *opts, int raw_sd, int ksd, void *mem);
 
 #endif // ACTION_H_

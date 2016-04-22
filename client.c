@@ -52,79 +52,81 @@
 #define DTLS_OVERHEAD           ((size_t)(13 + 8 + 16))
 #define TLS_OVERHEAD            ((size_t)(5 + 8 + 16))
 
-#define OPT_TLS                 't'
-#define OPT_DTLS                'd'
-#define OPT_SERVER_HOST         3
-#define OPT_SERVER_PORT         'p'
-#define OPT_SRC_PORT            5
-#define OPT_SENDFILE            6
-#define OPT_SEND_KTLS_COUNT     7
-#define OPT_SEND_GNUTLS_COUNT   8
-#define OPT_PAYLOAD             9
-#define OPT_SPLICE_COUNT        0x0A
-#define OPT_SENDFILE_MTU        'm'
-#define OPT_VERBOSE             'v'
-#define OPT_HELP                'h'
-#define OPT_SENDFILE_MMAP       0x0E
-#define OPT_SEND_KTLS_TIME      0x0F
-#define OPT_SEND_GNUTLS_TIME    0x10
-#define OPT_SPLICE_TIME         0x11
-#define OPT_SENDFILE_SIZE       0x12
-#define OPT_SPLICE_FILE         0x13
-#define OPT_SERVER_STORE        0x14
-#define OPT_SPLICE_ECHO_COUNT   0x15
-#define OPT_SPLICE_ECHO_TIME    0x16
-#define OPT_SERVER_KTLS         0x17
-#define OPT_JSON                'j'
-#define OPT_DROP_CACHES         'c'
-#define OPT_VERIFY_SENDPAGE     0x21
-#define OPT_VERIFY_TRANSMISSION 0x22
-#define OPT_VERIFY_SPLICE_READ  0x23
-#define OPT_VERIFY_HANDLING     0x24
-#define OPT_OUTPUT              'o'
-#define OPT_SENDFILE_USER       0x26
-#define OPT_SERVER_NO_ECHO      0x27
-#define OPT_SERVER_MTU          0x28
-#define OPT_RAW_SEND_TIME       0x29
-#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:"
+#define OPT_TLS                   't'
+#define OPT_DTLS                  'd'
+#define OPT_SERVER_HOST           3
+#define OPT_SERVER_PORT           'p'
+#define OPT_SRC_PORT              5
+#define OPT_SENDFILE              6
+#define OPT_SEND_KTLS_COUNT       7
+#define OPT_SEND_GNUTLS_COUNT     8
+#define OPT_PAYLOAD               9
+#define OPT_SPLICE_COUNT          0x0A
+#define OPT_SENDFILE_MTU          'm'
+#define OPT_VERBOSE               'v'
+#define OPT_HELP                  'h'
+#define OPT_SENDFILE_MMAP         0x0E
+#define OPT_SEND_KTLS_TIME        0x0F
+#define OPT_SEND_GNUTLS_TIME      0x10
+#define OPT_SPLICE_TIME           0x11
+#define OPT_SENDFILE_SIZE         0x12
+#define OPT_SPLICE_FILE           0x13
+#define OPT_SERVER_STORE          0x14
+#define OPT_SPLICE_ECHO_COUNT     0x15
+#define OPT_SPLICE_ECHO_TIME      0x16
+#define OPT_SERVER_KTLS           0x17
+#define OPT_JSON                  'j'
+#define OPT_DROP_CACHES           'c'
+#define OPT_VERIFY_SENDPAGE       0x21
+#define OPT_VERIFY_TRANSMISSION   0x22
+#define OPT_VERIFY_SPLICE_READ    0x23
+#define OPT_VERIFY_HANDLING       0x24
+#define OPT_OUTPUT                'o'
+#define OPT_SENDFILE_USER         0x26
+#define OPT_SERVER_NO_ECHO        0x27
+#define OPT_SERVER_MTU            0x28
+#define OPT_RAW_SEND_TIME         0x29
+#define OPT_SPLICE_SEND_RAW_TIME  0x2A
+#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:"
 
 static int thread_server_port = 0;
 
 static struct option long_options[] = {
-	/* -t   */{"tls",                 no_argument,        0,  OPT_TLS},
-	/* -d   */{"dtls",                no_argument,        0,  OPT_DTLS},
-	/* 0x3  */{"server-host",         required_argument,  0,  OPT_SERVER_HOST},
-	/* -p   */{"server-port",         required_argument,  0,  OPT_SERVER_PORT},
-	/* 0x05 */{"src-port",            required_argument,  0,  OPT_SRC_PORT},
-	/* 0x06 */{"sendfile",            required_argument,  0,  OPT_SENDFILE},
-	/* 0x07 */{"send-ktls-count",     required_argument,  0,  OPT_SEND_KTLS_COUNT},
-	/* 0x08 */{"send-gnutls-count",   required_argument,  0,  OPT_SEND_GNUTLS_COUNT},
-	/* 0x09 */{"payload",             required_argument,  0,  OPT_PAYLOAD},
-	/* 0x0A */{"splice-count",        required_argument,  0,  OPT_SPLICE_COUNT},
-	/* -m   */{"sendfile-mtu",        required_argument,  0,  OPT_SENDFILE_MTU},
-	/* -v   */{"verbose",             no_argument,        0,  OPT_VERBOSE},
-	/* -h   */{"help",                no_argument,        0,  OPT_HELP},
-	/* 0x0E */{"sendfile-mmap",       required_argument,  0,  OPT_SENDFILE_MMAP},
-	/* 0x0F */{"send-ktls-time",      required_argument,  0,  OPT_SEND_KTLS_TIME},
-	/* 0x10 */{"send-gnutls-time",    required_argument,  0,  OPT_SEND_GNUTLS_TIME},
-	/* 0x11 */{"splice-time",         required_argument,  0,  OPT_SPLICE_TIME},
-	/* 0x12 */{"sendfile-size",       required_argument,  0,  OPT_SENDFILE_SIZE},
-	/* 0x13 */{"splice-file",         required_argument,  0,  OPT_SPLICE_FILE},
-	/* 0x14 */{"server-store",        required_argument,  0,  OPT_SERVER_STORE},
-	/* 0x15 */{"splice-echo-count",   required_argument,  0,  OPT_SPLICE_ECHO_COUNT},
-	/* 0x16 */{"splice-echo-time",    required_argument,  0,  OPT_SPLICE_ECHO_TIME},
-	/* 0x17 */{"server-ktls",         no_argument,        0,  OPT_SERVER_KTLS},
-	/* -j   */{"json",                no_argument,        0,  OPT_JSON},
-	/* -c   */{"drop-caches",         no_argument,        0,  OPT_DROP_CACHES},
-	/* 0x21 */{"verify-sendpage",     no_argument,        0,  OPT_VERIFY_SENDPAGE},
-	/* 0x22 */{"verify-transmission", no_argument,        0,  OPT_VERIFY_TRANSMISSION},
-	/* 0x23 */{"verify-splice-read",  no_argument,        0,  OPT_VERIFY_SPLICE_READ},
-	/* 0x24 */{"verify-handling",     no_argument,        0,  OPT_VERIFY_HANDLING},
-	/* -o   */{"output",              required_argument,  0,  OPT_OUTPUT},
-	/* -o   */{"sendfile-user",       required_argument,  0,  OPT_SENDFILE_USER},
-	/* 0x27 */{"server-no-echo",      no_argument,        0,  OPT_SERVER_NO_ECHO},
-	/* 0x28 */{"server-mtu",          required_argument,  0,  OPT_SERVER_MTU},
-	/* 0x29 */{"raw-send-time",       required_argument,  0,  OPT_RAW_SEND_TIME},
+	/* -t   */{"tls",                   no_argument,        0,  OPT_TLS},
+	/* -d   */{"dtls",                  no_argument,        0,  OPT_DTLS},
+	/* 0x3  */{"server-host",           required_argument,  0,  OPT_SERVER_HOST},
+	/* -p   */{"server-port",           required_argument,  0,  OPT_SERVER_PORT},
+	/* 0x05 */{"src-port",              required_argument,  0,  OPT_SRC_PORT},
+	/* 0x06 */{"sendfile",              required_argument,  0,  OPT_SENDFILE},
+	/* 0x07 */{"send-ktls-count",       required_argument,  0,  OPT_SEND_KTLS_COUNT},
+	/* 0x08 */{"send-gnutls-count",     required_argument,  0,  OPT_SEND_GNUTLS_COUNT},
+	/* 0x09 */{"payload",               required_argument,  0,  OPT_PAYLOAD},
+	/* 0x0A */{"splice-count",          required_argument,  0,  OPT_SPLICE_COUNT},
+	/* -m   */{"sendfile-mtu",          required_argument,  0,  OPT_SENDFILE_MTU},
+	/* -v   */{"verbose",               no_argument,        0,  OPT_VERBOSE},
+	/* -h   */{"help",                  no_argument,        0,  OPT_HELP},
+	/* 0x0E */{"sendfile-mmap",         required_argument,  0,  OPT_SENDFILE_MMAP},
+	/* 0x0F */{"send-ktls-time",        required_argument,  0,  OPT_SEND_KTLS_TIME},
+	/* 0x10 */{"send-gnutls-time",      required_argument,  0,  OPT_SEND_GNUTLS_TIME},
+	/* 0x11 */{"splice-time",           required_argument,  0,  OPT_SPLICE_TIME},
+	/* 0x12 */{"sendfile-size",         required_argument,  0,  OPT_SENDFILE_SIZE},
+	/* 0x13 */{"splice-file",           required_argument,  0,  OPT_SPLICE_FILE},
+	/* 0x14 */{"server-store",          required_argument,  0,  OPT_SERVER_STORE},
+	/* 0x15 */{"splice-echo-count",     required_argument,  0,  OPT_SPLICE_ECHO_COUNT},
+	/* 0x16 */{"splice-echo-time",      required_argument,  0,  OPT_SPLICE_ECHO_TIME},
+	/* 0x17 */{"server-ktls",           no_argument,        0,  OPT_SERVER_KTLS},
+	/* -j   */{"json",                  no_argument,        0,  OPT_JSON},
+	/* -c   */{"drop-caches",           no_argument,        0,  OPT_DROP_CACHES},
+	/* 0x21 */{"verify-sendpage",       no_argument,        0,  OPT_VERIFY_SENDPAGE},
+	/* 0x22 */{"verify-transmission",   no_argument,        0,  OPT_VERIFY_TRANSMISSION},
+	/* 0x23 */{"verify-splice-read",    no_argument,        0,  OPT_VERIFY_SPLICE_READ},
+	/* 0x24 */{"verify-handling",       no_argument,        0,  OPT_VERIFY_HANDLING},
+	/* -o   */{"output",                required_argument,  0,  OPT_OUTPUT},
+	/* -o   */{"sendfile-user",         required_argument,  0,  OPT_SENDFILE_USER},
+	/* 0x27 */{"server-no-echo",        no_argument,        0,  OPT_SERVER_NO_ECHO},
+	/* 0x28 */{"server-mtu",            required_argument,  0,  OPT_SERVER_MTU},
+	/* 0x29 */{"raw-send-time",         required_argument,  0,  OPT_RAW_SEND_TIME},
+	/* 0x2A */{"splice-send-raw-time",  required_argument,  0,  OPT_SPLICE_SEND_RAW_TIME},
 	{0, 0, 0, 0}
 };
 
@@ -166,6 +168,7 @@ static void print_help(char *progname) {
 		"\t--splice-file FILE           specify file to be used with --splice-{count,time}\n"
 		"\t--splice-echo-count COUNT    perform echo splice(2) with server COUNT times\n"
 		"\t--splice-echo-time TIME      perform echo splice(2) with server TIME secs\n"
+		"\t--splice-send-raw-time TIME  perform splice(2) on AF_KTLS and send raw data\n"
 		"\n"
 		"\t--verify-sendpage            verify tls_sendpage() kernel implementation\n"
 		"\t--verify-transmission        verify tls_sendmsg(), tls_recvmsg() kernel implementation\n"
@@ -215,6 +218,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->sendfile_user = NULL;
 	opts->server_no_echo = false;
 	opts->raw_send_time = 0;
+	opts->splice_send_raw_time = 0;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -300,6 +304,14 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 				opts->splice_count = strtoul(optarg, &tmp_ptr, 10);
 				if (*tmp_ptr != '\0' || opts->splice_count == 0) {
 					print_error("unknown splice(2) count '%s'", optarg);
+					return -1;
+				}
+				break;
+
+			case OPT_SPLICE_SEND_RAW_TIME:
+				opts->splice_send_raw_time = strtoul(optarg, &tmp_ptr, 10);
+				if (*tmp_ptr != '\0' || opts->splice_send_raw_time == 0) {
+					print_error("unknown splice(2) send raw time '%s'", optarg);
 					return -1;
 				}
 				break;
@@ -482,7 +494,8 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->splice_time &&
 			!opts->sendfile_mmap &&
 			!opts->sendfile_user &&
-			!opts->raw_send_time) {
+			!opts->raw_send_time &&
+			!opts->splice_send_raw_time) {
 		if (!opts->verify) {
 			print_error("specify at least one benchamrking or verification option");
 			return -1;
@@ -498,7 +511,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 		return -1;
 	}
 
-	if ((opts->sendfile ||
+	if (opts->sendfile ||
 			opts->send_gnutls_count ||
 			opts->send_ktls_count ||
 			opts->splice_count ||
@@ -509,10 +522,11 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			opts->splice_time ||
 			opts->sendfile_mmap ||
 			opts->sendfile_user ||
-			opts->verify) &&
-			opts->raw_send_time) {
-		print_error("raw send can be run only as a standalone test");
-		return -1;
+			opts->verify) {
+		if (opts->raw_send_time || opts->splice_send_raw_time) {
+			print_error("raw send tests can be run only as a standalone benchmark");
+			return -1;
+		}
 	}
 
 	if (opts->verify && (opts->verify & (opts->verify - 1))) {
@@ -627,6 +641,8 @@ static void print_opts(const struct client_opts *opts) {
 	print_debug_client(opts, "output type:		%s", opts->json ? "JSON" : "text");
 	if (opts->raw_send_time)
 		print_debug_client(opts, "raw send time: %d", opts->raw_send_time);
+	if (opts->raw_send_time)
+		print_debug_client(opts, "raw splice send raw time: %u", opts->splice_send_raw_time);
 	if (opts->server_store)
 		print_debug_client(opts, "server store file (fd):		'%s'", opts->server_store);
 	if (opts->sendfile)
@@ -686,7 +702,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 	if (opts->send_ktls_count || opts->send_gnutls_count ||
 			opts->send_ktls_time || opts->send_gnutls_time ||
 			opts->splice_echo_time || opts->splice_echo_count ||
-			opts->raw_send_time) {
+			opts->raw_send_time || opts->splice_send_raw_time) {
 		err = posix_memalign((void **) &mem, 16, opts->payload_size);
 		memset(mem, 0, opts->payload_size);
 		if (err) {
@@ -733,9 +749,19 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		DO_DROP_CACHES(opts);
 	}
 
+	if (opts->raw_send_time) {
+		err = do_raw_send_time(opts, session, udp_sd, mem);
+		if (err < 0) {
+			print_error("failed to do raw send");
+			goto action_error_ksd;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
 	if (opts->send_ktls_count || opts->sendfile || opts->splice_count
 			|| opts->send_ktls_time || opts->send_gnutls_time || opts->splice_time
-			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify) {
+			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify
+			|| opts->splice_send_raw_time) {
 		ksd = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, opts->tls);
 		if (ksd < 0) {
 			print_error("failed to get AF_KTLS socket");
@@ -744,10 +770,10 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		DO_DROP_CACHES(opts);
 	}
 
-	if (opts->raw_send_time) {
-		err = do_raw_send_time(opts, session, udp_sd, mem);
+	if (opts->splice_send_raw_time) {
+		err = do_splice_send_raw_time(opts, udp_sd, ksd, mem);
 		if (err < 0) {
-			print_error("failed to do raw send");
+			print_error("failed to do splice raw send");
 			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
@@ -937,7 +963,7 @@ static void client_opts2server_opts(const struct client_opts *client_opts,
 	server_opts->ktls = client_opts->server_ktls;
 	server_opts->no_echo = client_opts->server_no_echo;
 	server_opts->mtu = client_opts->server_mtu;
-	server_opts->raw_recv = client_opts->raw_send_time > 0;
+	server_opts->raw_recv = (client_opts->raw_send_time || client_opts->splice_send_raw_time);
 }
 
 int main(int argc, char *argv[]) {
