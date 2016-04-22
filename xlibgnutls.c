@@ -148,7 +148,7 @@ extern int xlibgnutls_tls_handshake(gnutls_session_t *session, int tcp_sd, unsig
 }
 
 extern int xlibgnutls_tls_terminate(gnutls_session_t session) {
-	gnutls_bye(session, GNUTLS_SHUT_RDWR);
+	gnutls_bye(session, GNUTLS_SHUT_WR);
 
 	gnutls_deinit(session);
 	gnutls_anon_free_client_credentials(anoncred);
