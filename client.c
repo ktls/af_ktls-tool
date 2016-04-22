@@ -883,7 +883,6 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		if (err) {
 			// but there is nothing to do with it now...
 			print_error("failed to destruct AF_KTLS socket");
-			close(ksd);
 			goto action_error;
 		}
 	}
@@ -894,10 +893,8 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 	return 0;
 
 action_error_ksd:
-	if (ksd) {
+	if (ksd)
 		ktls_socket_destruct(ksd, session);
-		close(ksd);
-	}
 
 action_error:
 	if (mem)
