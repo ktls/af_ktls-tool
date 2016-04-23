@@ -84,6 +84,26 @@ for protocol in "--tls" "--dtls"; do
 					--sendfile-mmap ${file}  \
 					--output "${TEST_OUTPUT_DIR}/output.${i}.json"
 				stop_server
+
+				# now we will test without encryption
+				if [ ${protocol} == "--dtls" ]; then
+					plain_protocol="--udp"
+				else
+					plain_protocol="--tcp"
+				fi
+
+				TEST_OUTPUT_DIR="${OUTPUT_DIR}/plain-sendfile-${file}-${payload}${plain_protocol}"
+				xecho "Performing benchmark, output: ${TEST_OUTPUT_DIR}"
+				[ -d "${TEST_OUTPUT_DIR}" ] || mkdir "${TEST_OUTPUT_DIR}"
+
+				run_server "${plain_protocol}" --no-echo
+				run_client "${plain_protocol}" --sendfile-mtu ${payload} \
+					--plain-sendfile-user ${file} \
+					--plain-sendfile-mmap ${file}  \
+					--plain-sendfile ${file}  \
+					--plain-splice-emu ${file}  \
+					--output "${TEST_OUTPUT_DIR}/output.${i}.json"
+				stop_server
 			done
 
 			########## sendmsg(2) and recvmsg(2) - COUNT

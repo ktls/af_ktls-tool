@@ -87,7 +87,13 @@
 #define OPT_SERVER_MTU            0x28
 #define OPT_RAW_SEND_TIME         0x29
 #define OPT_SPLICE_SEND_RAW_TIME  0x2A
-#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:"
+#define OPT_PLAIN_SENDFILE        0x2B
+#define OPT_PLAIN_SENDFILE_USER   0x2C
+#define OPT_PLAIN_SPLICE_EMU      0x2D
+#define OPT_PLAIN_SENDFILE_MMAP   0x2E
+#define OPT_TCP                   0x2F
+#define OPT_UDP                   0x30
+#define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:\x2B:\x2C:\x2D:\x2E:\x2F\x30"
 
 static int thread_server_port = 0;
 
@@ -127,6 +133,12 @@ static struct option long_options[] = {
 	/* 0x28 */{"server-mtu",            required_argument,  0,  OPT_SERVER_MTU},
 	/* 0x29 */{"raw-send-time",         required_argument,  0,  OPT_RAW_SEND_TIME},
 	/* 0x2A */{"splice-send-raw-time",  required_argument,  0,  OPT_SPLICE_SEND_RAW_TIME},
+	/* 0x2B */{"plain-sendfile",        required_argument,  0,  OPT_PLAIN_SENDFILE},
+	/* 0x2C */{"plain-sendfile-user",   required_argument,  0,  OPT_PLAIN_SENDFILE_USER},
+	/* 0x2D */{"plain-splice-emu",      required_argument,  0,  OPT_PLAIN_SPLICE_EMU},
+	/* 0x2E */{"plain-sendfile-mmap",   required_argument,  0,  OPT_PLAIN_SENDFILE_MMAP},
+	/* 0x2F */{"tcp",                   no_argument,        0,  OPT_TCP},
+	/* 0x30 */{"udp",                   no_argument,        0,  OPT_UDP},
 	{0, 0, 0, 0}
 };
 
@@ -136,8 +148,10 @@ static void print_help(char *progname) {
 		"Usage: %s OPTIONS\n"
 		"Benchmark Gnu TLS and AL_TLS kernel implementation\n"
 		"\nOptions:\n\n"
-		"\t--tls|-t                     benchmark TLS protocol\n"
-		"\t--dtls|-d                    benchmark DTLS protocol; the default is TLS\n"
+		"\t--tls|-t                     benchmark over TLS protocol\n"
+		"\t--dtls|-d                    benchmark over DTLS protocol; the default is TLS\n"
+		"\t--tcp                        benchmark over TCP protocol\n"
+		"\t--udp                        benchmark over UDP protocol; the default is TCP\n"
 		"\t--server-host|-h HOST        specify destination host; if omitted, server is run in a thread\n"
 		"\t--server-port|-p PORT        specify destination port; if omitted, 5557 is used if server-host specified,\n"
 		"\t                             otherwise port for thread server will be assigned\n"
@@ -175,6 +189,11 @@ static void print_help(char *progname) {
 		"\t--verify-splice-read         verify tls_splice_read() kernel implementation\n"
 		"\t--verify-handling            verify tls_setsockopt()/tls_getsockopt() kernel implementation\n"
 		"\n"
+		"\t--plain-sendfile FILE        send file FILE unencrypted using sendfile(2)\n"
+		"\t--plain-sendfile-user FILE   send file FILE unencrypted using read(2) and send(2)\n"
+		"\t--plain-splice-emu FILE      send file FILE unencrypted using sendfile splice(2) emulation\n"
+		"\t--plain-sendfile-mmap FILE   send file FILE unencrypted using mmap(2), read(2) and send(2)\n"
+		"\n"
 		"\t--output|-o                  set output file\n"
 		"\t--verbose|-v                 be verbose like an old lady at marketplace, can be used multiple times\n"
 		"\t--json|-j                    output in JSON instead of text\n"
@@ -189,9 +208,11 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	int idx = 0;
 	char *tmp_ptr = NULL;
 	bool protocol_seen = false;
+	bool no_tls_protocol_seen = false;
 
 	// assign default values at first
 	opts->tls = true;
+	opts->tcp = true;
 	opts->server_port = 5557;
 	opts->src_port = 0;
 	opts->sendfile = NULL;
@@ -219,6 +240,10 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->server_no_echo = false;
 	opts->raw_send_time = 0;
 	opts->splice_send_raw_time = 0;
+	opts->plain_sendfile = NULL;
+	opts->plain_sendfile_user = NULL;
+	opts->plain_sendfile_mmap = NULL;
+	opts->plain_splice_emu = NULL;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -234,7 +259,11 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			case OPT_TLS:
 				if (protocol_seen) {
 					print_error("option '--dtls' is disjoint with --tls");
-					return -1;
+					return 1;
+				}
+				if (no_tls_protocol_seen) {
+					print_error("option --dtls/--tls is disjoint with --udp/--tcp");
+					return 1;
 				}
 				protocol_seen = true;
 				opts->tls = true;
@@ -242,10 +271,38 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			case OPT_DTLS:
 				if (protocol_seen) {
 					print_error("option '--dtls' is disjoint with --tls");
-					return -1;
+					return 1;
+				}
+				if (no_tls_protocol_seen) {
+					print_error("option --dtls/--tls is disjoint with --udp/--tcp");
+					return 1;
 				}
 				protocol_seen = true;
 				opts->tls = false;
+				break;
+			case OPT_TCP:
+				if (no_tls_protocol_seen && !opts->tcp) {
+					print_error("option --tcp is disjoint with --udp");
+					return 1;
+				}
+				if (protocol_seen) {
+					print_error("option --tcp/--udp is disjoint with --tls/--dtls");
+					return 1;
+				}
+				no_tls_protocol_seen = true;
+				opts->tcp = true;
+				break;
+			case OPT_UDP:
+				if (no_tls_protocol_seen && opts->tcp) {
+					print_error("option --udp is disjoint with --tcp");
+					return 1;
+				}
+				if (protocol_seen) {
+					print_error("option --tcp/--udp is disjoint with --tls/--dtls");
+					return 1;
+				}
+				no_tls_protocol_seen = true;
+				opts->tcp = false;
 				break;
 			case OPT_SERVER_HOST:
 				if (opts->server_host) {
@@ -428,6 +485,34 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 					return -1;
 				}
 				break;
+			case OPT_PLAIN_SENDFILE:
+				if (opts->plain_sendfile) {
+					print_error("multiple --plain-sendfile supplied");
+					return -1;
+				}
+				opts->plain_sendfile = optarg;
+				break;
+			case OPT_PLAIN_SENDFILE_USER:
+				if (opts->plain_sendfile_user) {
+					print_error("multiple --plain-sendfile-user supplied");
+					return -1;
+				}
+				opts->plain_sendfile_user = optarg;
+				break;
+			case OPT_PLAIN_SPLICE_EMU:
+				if (opts->plain_splice_emu) {
+					print_error("multiple --plain-splice-emu supplied");
+					return -1;
+				}
+				opts->plain_splice_emu = optarg;
+				break;
+			case OPT_PLAIN_SENDFILE_MMAP:
+				if (opts->plain_sendfile_mmap) {
+					print_error("multiple --plain-sendfile-mmap supplied");
+					return -1;
+				}
+				opts->plain_sendfile_mmap = optarg;
+				break;
 			case OPT_SERVER_NO_ECHO:
 				opts->server_no_echo = true;
 				break;
@@ -495,6 +580,10 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->sendfile_mmap &&
 			!opts->sendfile_user &&
 			!opts->raw_send_time &&
+			!opts->plain_sendfile &&
+			!opts->plain_sendfile_user &&
+			!opts->plain_sendfile_mmap &&
+			!opts->plain_splice_emu &&
 			!opts->splice_send_raw_time) {
 		if (!opts->verify) {
 			print_error("specify at least one benchamrking or verification option");
@@ -527,6 +616,14 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			print_error("raw send tests can be run only as a standalone benchmark");
 			return -1;
 		}
+
+		if (opts->plain_sendfile ||
+				opts->plain_sendfile_mmap ||
+				opts->plain_sendfile_user ||
+				opts->plain_splice_emu) {
+			print_error("plain tests can be run only as a standalone benchmark");
+			return -1;
+		}
 	}
 
 	if (opts->verify && (opts->verify & (opts->verify - 1))) {
@@ -544,9 +641,26 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 		return -1;
 	}
 
-	if (opts->sendfile_mtu && !opts->sendfile && !opts->sendfile_user && !opts->splice_echo_count && !opts->splice_echo_time && !opts->sendfile_mtu) {
-		print_error("--sendfile-mtu can be used only with --sendfile "
-				    "--sendfile_mmap, --sendfile-user, --splice_echo_time, --splice_echo_time");
+	if (!opts->sendfile_mtu &&
+			(opts->plain_sendfile ||
+			 opts->plain_sendfile_mmap ||
+			 opts->plain_splice_emu ||
+			 opts->plain_sendfile_user)) {
+		print_error("--sendfile-mtu required");
+		return -1;
+	}
+
+	if (opts->sendfile_mtu &&
+			!opts->sendfile &&
+			!opts->sendfile_user &&
+			!opts->splice_echo_count &&
+			!opts->splice_echo_time &&
+			!opts->plain_sendfile &&
+			!opts->plain_sendfile_mmap &&
+			!opts->plain_sendfile_user &&
+			!opts->splice_send_raw_time &&
+			!opts->plain_splice_emu) {
+		print_error("invalid use of --sendfile-mtu");
 		return -1;
 	}
 
@@ -641,6 +755,14 @@ static void print_opts(const struct client_opts *opts) {
 	print_debug_client(opts, "output type:		%s", opts->json ? "JSON" : "text");
 	if (opts->raw_send_time)
 		print_debug_client(opts, "raw send time: %d", opts->raw_send_time);
+	if (opts->plain_sendfile)
+		print_debug_client(opts, "plain sendfile: %s", opts->plain_sendfile);
+	if (opts->plain_sendfile_user)
+		print_debug_client(opts, "plain user send file: %s", opts->plain_sendfile_user);
+	if (opts->plain_splice_emu)
+		print_debug_client(opts, "plain send file emulation using splice: %s", opts->plain_splice_emu);
+	if (opts->plain_sendfile_mmap)
+		print_debug_client(opts, "plain send file mmap(2): %s", opts->plain_splice_emu);
 	if (opts->raw_send_time)
 		print_debug_client(opts, "raw splice send raw time: %u", opts->splice_send_raw_time);
 	if (opts->server_store)
@@ -692,6 +814,49 @@ extern int do_drop_caches(void) {
 		perror("close:failed to drop caches");
 
 	return ret;
+}
+
+static int do_plain_action(const struct client_opts *opts, int sd) {
+	int err;
+
+	if (opts->plain_sendfile) {
+		err = do_plain_sendfile(opts, sd);
+		if (err < 0) {
+			print_error("failed to do plain sendfile");
+			goto out;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
+	if (opts->plain_sendfile_user) {
+		err = do_plain_sendfile_user(opts, sd);
+		if (err < 0) {
+			print_error("failed to do plain sendfile");
+			goto out;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
+	if (opts->plain_sendfile_mmap) {
+		err = do_plain_sendfile_mmap(opts, sd);
+		if (err < 0) {
+			print_error("failed to do plain send file with mmap(2)");
+			goto out;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
+	if (opts->plain_splice_emu) {
+		err = do_plain_splice_emu(opts, sd);
+		if (err < 0) {
+			print_error("failed to do splice(2) sendfile emulation");
+			goto out;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
+out:
+	return err;
 }
 
 static int do_action(const struct client_opts *opts, gnutls_session_t session,  int udp_sd) {
@@ -912,31 +1077,47 @@ static int run_client(const struct client_opts *opts) {
 	/* connect to the peer */
 	host = opts->server_host ? opts->server_host : "localhost";
 
-	if (opts->tls)
-		sd = tcp_connect(host, opts->server_port);
-	else
-		sd = udp_connect(host, opts->server_port);
+	if (opts->plain_sendfile ||
+			opts->plain_sendfile_user ||
+			opts->plain_sendfile_mmap ||
+			opts->plain_splice_emu) {
+		if (opts->tcp)
+			sd = tcp_connect(host, opts->server_port);
+		else
+			sd = udp_connect(host, opts->server_port);
 
-	if (sd < 0)
-		goto end;
+		if (sd < 0)
+			goto end;
 
-	if (opts->tls)
-		err = xlibgnutls_tls_handshake(&session, sd, opts->verbose_level);
-	else
-		err = xlibgnutls_dtls_handshake(&session, sd, opts->verbose_level);
+		// these tests do not require TLS, so no handshake is done and so
+		err = do_plain_action(opts, sd);
 
-	if (err < 0) {
-		print_error("failed to do handshake");
-		goto end;
+	} else {
+		if (opts->tls)
+			sd = tcp_connect(host, opts->server_port);
+		else
+			sd = udp_connect(host, opts->server_port);
+
+		if (sd < 0)
+			goto end;
+
+		if (opts->tls)
+			err = xlibgnutls_tls_handshake(&session, sd, opts->verbose_level);
+		else
+			err = xlibgnutls_dtls_handshake(&session, sd, opts->verbose_level);
+
+		if (err < 0) {
+			print_error("failed to do handshake");
+			goto end;
+		}
+		print_touch_reset(); // handshake does not taint benchmarks, so reset flag
+		err = do_action(opts, session, sd);
+
+		if (opts->tls)
+			xlibgnutls_tls_terminate(session);
+		else
+			xlibgnutls_dtls_terminate(session);
 	}
-
-	print_touch_reset(); // handshake does not taint benchmarks, so reset flag
-	err = do_action(opts, session, sd);
-
-	if (opts->tls)
-		xlibgnutls_tls_terminate(session);
-	else
-		xlibgnutls_dtls_terminate(session);
 
 end:
 	if (opts->tls && sd > 0)
@@ -961,6 +1142,11 @@ static void client_opts2server_opts(const struct client_opts *client_opts,
 	server_opts->no_echo = client_opts->server_no_echo;
 	server_opts->mtu = client_opts->server_mtu;
 	server_opts->raw_recv = (client_opts->raw_send_time || client_opts->splice_send_raw_time);
+	server_opts->no_tls = (client_opts->plain_sendfile ||
+			client_opts->plain_sendfile_mmap ||
+			client_opts->plain_sendfile_user ||
+			client_opts->plain_splice_emu);
+	server_opts->tcp = client_opts->tcp;
 }
 
 int main(int argc, char *argv[]) {

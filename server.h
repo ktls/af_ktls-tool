@@ -12,6 +12,7 @@
 #ifndef SERVER_H_
 #define SERVER_H_
 
+#include <stdbool.h>
 #include <sys/socket.h>
 #include <pthread.h>
 
@@ -40,6 +41,9 @@ struct server_opts {
 	bool ktls;
 	bool no_echo;
 	bool raw_recv;
+	/* without TLS options */
+	bool no_tls;
+	bool tcp;
 };
 
 extern int server_err;

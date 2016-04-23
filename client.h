@@ -25,6 +25,7 @@
 
 struct client_opts {
 	bool tls;
+	bool tcp;
 	const char *server_host;
 	unsigned server_port;
 	unsigned src_port;
@@ -55,6 +56,10 @@ struct client_opts {
 	unsigned server_mtu;
 	unsigned raw_send_time;
 	unsigned splice_send_raw_time;
+	const char *plain_sendfile;
+	const char *plain_sendfile_user;
+	const char *plain_sendfile_mmap;
+	const char *plain_splice_emu;
 };
 
 extern int do_drop_caches(void);

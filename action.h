@@ -28,4 +28,9 @@ extern int do_sendfile(const struct client_opts *opts, int ksd);
 extern int do_raw_send_time(const struct client_opts *opts, gnutls_session_t session, int raw_sd, void *mem);
 extern int do_splice_send_raw_time(const struct client_opts *opts, int raw_sd, int ksd, void *mem);
 
+extern int do_plain_sendfile_user(const struct client_opts *otps, int sd);
+extern int do_plain_sendfile_mmap(const struct client_opts *opts, int sd);
+extern int do_plain_splice_emu(const struct client_opts *opts, int sd);
+extern int do_plain_sendfile(const struct client_opts *opts, int sd);
+
 #endif // ACTION_H_

@@ -38,6 +38,29 @@
 
 #define MIN(A, B)	((A) < (B) ? (A) : (B))
 
+static ssize_t get_file_size(int fd) {
+	ssize_t err;
+	ssize_t filesize;
+
+	filesize = lseek(fd, 0L, SEEK_END);
+	if (filesize < 0) {
+		perror("lseek() to EOF");
+		err = filesize;
+		goto out;
+	}
+
+	err = lseek(fd, 0L, SEEK_SET);
+	if (err < 0) {
+		perror("lseek() to beginning");
+		goto out;
+	}
+
+	return filesize;
+
+out:
+	return err;
+}
+
 static void print_send_count_stats(const struct client_opts *opts, bool gnutls, size_t total_sent, size_t total_recv, double clocks) {
 	const char *json_msg = \
 		"  {\n"
@@ -374,6 +397,37 @@ static void print_splice_echo_count_stats(const struct client_opts *opts, size_t
 				clocks);
 	else
 		print_stats(txt_msg, opts->payload_size, opts->splice_echo_count, total_sent, total_recv, clocks);
+}
+
+static void print_plain_stats(const struct client_opts *opts, const char *testname, const char *filename, size_t total_sent, size_t total_recv, double elapsed) {
+	const char *json_msg = \
+		"  {\n"
+		"    \"test\": \"%s\",\n"
+		"    \"type\": \"time\",\n"
+		"    \"configuration\": {\n"
+		"      \"filesize\": %lu,\n"
+		"      \"mtu\": %u,\n"
+		"      \"filename\": \"%s\"\n"
+		"    },\n"
+		"    \"result\": {\n"
+		"      \"sent\": %lu,\n"
+		"      \"received\": %lu,\n"
+		"      \"elapsed\": %g\n"
+		"    }\n"
+		"  }";
+	const char *txt_msg = \
+		"statistics for %s:\n"
+		"file size (from param): %lu\n"
+		"mtu:                    %lu\n"
+		"file:                   %s\n"
+		"total bytes sent:       %lu\n"
+		"total bytes received:   %lu\n"
+		"elapsed time:           %g\n";
+
+	const char *msg = opts->json ? json_msg : txt_msg;
+
+	print_stats(msg, testname, opts->sendfile_size, opts->sendfile_mtu,
+			filename, total_sent, total_recv, elapsed);
 }
 
 extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnutls_session_t session, int flags) {
@@ -1116,5 +1170,259 @@ extern int do_sendfile(const struct client_opts *opts, int ksd) {
 		print_sendfile_stats(opts, filesize, total, ((double) (end - start)) / CLOCKS_PER_SEC);
 
 	return total;
+}
+
+/* actions not using TLS - plain text actions  */
+
+extern int do_plain_sendfile_user(const struct client_opts *opts, int sd) {
+	int err;
+	int fd = 0;
+	off_t offset = 0;
+	ssize_t filesize;
+	size_t sent, mtu;
+	clock_t start, end;
+	char *buf = NULL;
+
+	fd = open(opts->plain_sendfile_user, O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		err = fd;
+		goto out;
+	}
+
+	if (opts->sendfile_size == 0) {
+		filesize = get_file_size(fd);
+		if (filesize < 0) {
+			err = filesize;
+			goto out;
+		}
+	} else
+		filesize = opts->sendfile_size;
+
+	buf = malloc(opts->sendfile_mtu);
+	if (!buf) {
+		perror("malloc");
+		err = -errno;
+		goto out;
+	}
+
+	// we do this explicitly because of get_file_size()
+	DO_DROP_CACHES(opts);
+
+	start = clock();
+
+	for (sent = 0; sent != filesize; sent += err) {
+		err = read(fd, buf, opts->sendfile_mtu);
+		if (err < 0) {
+			perror("read");
+			goto out;
+		}
+
+		if (err == 0) // EOF reached
+			break;
+
+		err = send(sd, buf, err, 0);
+
+		if (err < 0) {
+			perror("send");
+			goto out;
+		}
+	}
+
+	end = clock();
+
+	print_plain_stats(opts, "plain send file user", opts->plain_sendfile_user,
+			sent, 0, ((double) (end - start)) / CLOCKS_PER_SEC);
+
+out:
+	if (fd > 0)
+		close(fd);
+
+	if (buf)
+		free(buf);
+
+	return err;
+}
+
+extern int do_plain_sendfile_mmap(const struct client_opts *opts, int sd) {
+	int err;
+	int fd = 0;
+	off_t offset = 0;
+	ssize_t filesize;
+	size_t sent, mtu;
+	clock_t start, end;
+	char *mem;
+
+	fd = open(opts->plain_sendfile_mmap, O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		err = fd;
+		goto out;
+	}
+
+	if (opts->sendfile_size == 0) {
+		filesize = get_file_size(fd);
+		if (filesize < 0) {
+			err = filesize;
+			goto out;
+		}
+	} else
+		filesize = opts->sendfile_size;
+
+	mtu = MIN(filesize, opts->sendfile_mtu);
+
+	// we do this explicitly because of get_file_size()
+	DO_DROP_CACHES(opts);
+
+	mem = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, /*offset*/0);
+	if (!mem) {
+		perror("mmap");
+		err = -1;
+		goto out;
+	}
+
+	start = clock();
+
+	for (sent = 0; sent != filesize; sent += err) {
+		err = send(sd, mem + sent, MIN(filesize - sent, mtu), 0);
+		if (err < 0) {
+			perror("sendfile");
+			goto out;
+		}
+	}
+
+	end = clock();
+
+	print_plain_stats(opts, "plain send file mmap", opts->plain_sendfile_mmap,
+			sent, 0, ((double) (end - start)) / CLOCKS_PER_SEC);
+
+out:
+	if (fd > 0)
+		close(fd);
+
+	if (mem)
+		munmap(mem, filesize);
+
+	return err;
+}
+
+extern int do_plain_splice_emu(const struct client_opts *opts, int sd) {
+	int err;
+	int fd = 0;
+	int p[2] = {0, 0};
+	clock_t start, end;
+	size_t total_sent = 0;
+	size_t total_recv = 0; // not used now
+	ssize_t filesize;
+
+	err = pipe(p);
+	if (err) {
+		perror("pipe");
+		return err;
+	}
+
+	fd = open(opts->plain_splice_emu, O_RDONLY);
+	if (fd < 0) {
+		perror(opts->plain_splice_emu);
+		err = fd;
+		goto out;
+	}
+
+	if (!opts->sendfile_size) {
+		filesize = get_file_size(fd);
+		if (filesize < 0) {
+			err = filesize;
+			goto out;
+		}
+	} else
+		filesize = opts->sendfile_size;
+
+	// explicitly because of get_file_size()
+	DO_DROP_CACHES(opts);
+
+	start = clock();
+
+	for (total_sent = 0; total_sent != filesize; total_sent += err) {
+		err = splice(fd, NULL, p[1], NULL, opts->sendfile_mtu, 0);
+		if (err < 0) {
+			perror("splice");
+			goto out;
+		}
+
+		if (err == 0) // EOF reached
+			break;
+
+		err = splice(p[0], NULL, sd, NULL, opts->sendfile_mtu, 0);
+		if (err < 0) {
+			perror("splice");
+			goto out;
+		}
+	}
+
+	end = clock();
+
+	print_plain_stats(opts, "plain splice(2) send file emu", opts->plain_splice_emu,
+			total_sent, 0, ((double) (end - start)) / CLOCKS_PER_SEC);
+out:
+	if (p[0])
+		close(p[0]);
+	if (p[1])
+		close(p[1]);
+	if (fd > 0)
+		close(fd);
+
+	return err;
+}
+
+extern int do_plain_sendfile(const struct client_opts *opts, int sd) {
+	int err;
+	int fd = 0;
+	off_t offset = 0;
+	ssize_t filesize;
+	size_t sent, mtu;
+	clock_t start, end;
+
+	fd = open(opts->plain_sendfile, O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		err = fd;
+		goto out;
+	}
+
+	if (opts->sendfile_size == 0) {
+		filesize = get_file_size(fd);
+		if (filesize < 0) {
+			err = filesize;
+			goto out;
+		}
+	} else
+		filesize = opts->sendfile_size;
+
+	if (opts->sendfile_mtu)
+		mtu = MIN(filesize, opts->sendfile_mtu);
+	else
+		mtu = filesize;
+
+	// we do this explicitly because of get_file_size()
+	DO_DROP_CACHES(opts);
+
+	start = clock();
+
+	for (sent = 0; sent != filesize; sent += err) {
+		err = sendfile(sd, fd, &offset, mtu);
+		if (err < 0) {
+			perror("sendfile");
+		}
+	}
+
+	end = clock();
+
+	print_plain_stats(opts, "plain sendfile(2)", opts->plain_sendfile,
+			sent, 0, ((double) (end - start)) / CLOCKS_PER_SEC);
+
+out:
+	if (fd > 0)
+		close(fd);
+	return err;
 }
 

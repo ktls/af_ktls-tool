@@ -33,6 +33,7 @@
 #include <gnutls/dtls.h>
 #include <gnutls/crypto.h>
 
+#include "plain_server.h"
 #include "server.h"
 #include "common.h"
 #include "ktls.h"
@@ -43,7 +44,6 @@
 #define CRLFILE "/etc/ocserv/cert.key"
 
 #define SOCKET_ERR(err,s) if(err==-1) {perror(s);return(1);}
-#define DEFAULT_PORT 5557
 
 /*
  * we will do it with global var since we want to capture error in thread even
@@ -224,7 +224,7 @@ static int dtls_run_server(struct server_opts *opts) {
 	memset(&sa_serv, '\0', sizeof(sa_serv));
 	sa_serv.sin_family = AF_INET;
 	sa_serv.sin_addr.s_addr = INADDR_ANY;
-	sa_serv.sin_port = htons(DEFAULT_PORT);
+	sa_serv.sin_port = htons(opts->port);
 
 	{
 		/* DTLS requires the IP don't fragment (DF) bit to be set */
@@ -241,11 +241,12 @@ static int dtls_run_server(struct server_opts *opts) {
 	bind(listen_sd, (struct sockaddr *) &sa_serv, sizeof(sa_serv));
 
 	if (opts->verbose_level >= VERBOSE_LEVEL_SERVER)
-		print_info("UDP server ready. Listening to port '%d'!", DEFAULT_PORT);
+		print_info("UDP server ready. Listening to port '%d'!", opts->port);
 
 	if (opts->condition_initialized) {
 		if (opts->port_mem)
-			*opts->port_mem = DEFAULT_PORT;
+			// TODO: get actual port
+			*opts->port_mem = opts->port;
 		pthread_cond_broadcast(opts->condition_initialized);
 	}
 
@@ -595,7 +596,8 @@ static int tls_run_server(struct server_opts *opts) {
 
 	if (opts->condition_initialized) {
 		if (opts->port_mem)
-			*opts->port_mem = DEFAULT_PORT;
+			// TODO: get actual port
+			*opts->port_mem = opts->port;
 		pthread_cond_broadcast(opts->condition_initialized);
 	}
 
@@ -653,10 +655,18 @@ extern void *run_server(void *arg) {
 	int ret;
 	struct server_opts *opts = (struct server_opts *) arg;
 
-	if (opts->tls) {
-		ret = tls_run_server(opts);
+	if (opts->no_tls) {
+		if (opts->tcp) {
+			ret = plain_tcp_server(opts);
+		} else {
+			ret = plain_udp_server(opts);
+		}
 	} else {
-		ret = dtls_run_server(opts);
+		if (opts->tls) {
+			ret = tls_run_server(opts);
+		} else {
+			ret = dtls_run_server(opts);
+		}
 	}
 
 	server_err = ret;

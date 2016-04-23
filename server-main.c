@@ -33,7 +33,9 @@
 #define OPT_NO_ECHO             'x'
 #define OPT_MTU                 'm'
 #define OPT_RAW_RECV            'r'
-#define OPT_SHORT_OPTS          "tdp:vs:hxm:"
+#define OPT_TCP                 'c'
+#define OPT_UDP                 'u'
+#define OPT_SHORT_OPTS          "tdp:vs:hxm:cu"
 
 static struct option long_options[] = {
 	/* -t */{"tls",                no_argument,        0,  OPT_TLS},
@@ -46,6 +48,8 @@ static struct option long_options[] = {
 	/* -x */{"no-echo",            no_argument,        0,  OPT_NO_ECHO},
 	/* -m */{"mtu",                required_argument,  0,  OPT_MTU},
 	/* -r */{"raw-recv",           no_argument,        0,  OPT_RAW_RECV},
+	/* -c */{"tcp",                no_argument,        0,  OPT_TCP},
+	/* -u */{"udp",                no_argument,        0,  OPT_UDP},
 	{0, 0, 0, 0}
 };
 static void print_help(char *progname) {
@@ -61,7 +65,9 @@ static void print_help(char *progname) {
 		"\t--ktls|-k                    use AF_KTLS for communication\n"
 		"\t--no-echo                    do not echo data messages\n"
 		"\t--raw_recv                   expect unencrypted data\n"
-		"\t--mtu                        set MTU"
+		"\t--mtu                        set MTU\n"
+		"\t--tcp|-c                     use TCP (can be used only with --no-tls)\n"
+		"\t--udp|-u                     use UDP (can be used only with --no-tls)\n"
 		"\t--help|-h                    print this help\n\n";
 
 	assert(progname);
@@ -73,20 +79,23 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 	int idx = 0;
 	char *tmp_ptr = NULL;
 	bool protocol_seen = false;
+	bool no_tls_protocol_seen = false;
 
 	// assign default values at first
 	opts->tls = true;
 	opts->port = 0;
 	opts->verbose_level = VERBOSE_LEVEL_SILENT;
 	opts->store_file = 0;
-	// not used when standalone process
-	opts->port_mem = NULL;
-	opts->condition_initialized = NULL;
 	opts->store_file = 0;
 	opts->ktls = false;
 	opts->no_echo = false;
 	opts->raw_recv = false;
+	opts->no_tls = false;
+	opts->tcp = true;
 	opts->mtu = SERVER_MAX_MTU;
+	// not used when standalone process
+	opts->port_mem = NULL;
+	opts->condition_initialized = NULL;
 
 	for (;;) {
 		c = getopt_long (argc, argv, OPT_SHORT_OPTS, long_options, &idx);
@@ -96,20 +105,56 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 
 		switch (c) {
 			case OPT_TLS:
-				if (protocol_seen) {
-					print_error("option '--dtls' is disjoint with --tls");
+				if (protocol_seen && !opts->tls) {
+					print_error("option --tls is disjoint with --dtls");
+					return 1;
+				}
+				if (no_tls_protocol_seen) {
+					print_error("option --dtls/--tls is disjoint with --udp/--tcp");
 					return 1;
 				}
 				protocol_seen = true;
 				opts->tls = true;
+				opts->no_tls = false;
 				break;
 			case OPT_DTLS:
-				if (protocol_seen) {
-					print_error("option '--dtls' is disjoint with --tls");
+				if (protocol_seen && opts->tls) {
+					print_error("option --dtls is disjoint with --tls");
+					return 1;
+				}
+				if (no_tls_protocol_seen) {
+					print_error("option --dtls/--tls is disjoint with --udp/--tcp");
 					return 1;
 				}
 				protocol_seen = true;
 				opts->tls = false;
+				opts->no_tls = false;
+				break;
+			case OPT_TCP:
+				if (no_tls_protocol_seen && !opts->tcp) {
+					print_error("option --tcp is disjoint with --udp");
+					return 1;
+				}
+				if (protocol_seen) {
+					print_error("option --tcp/--udp is disjoint with --tls/--dtls");
+					return 1;
+				}
+				no_tls_protocol_seen = true;
+				opts->tcp = true;
+				opts->no_tls = true;
+				break;
+			case OPT_UDP:
+				if (no_tls_protocol_seen && opts->tcp) {
+					print_error("option --udp is disjoint with --tcp");
+					return 1;
+				}
+				if (protocol_seen) {
+					print_error("option --tcp/--udp is disjoint with --tls/--dtls");
+					return 1;
+				}
+				no_tls_protocol_seen = true;
+				opts->tcp = false;
+				opts->no_tls = true;
 				break;
 			case OPT_PORT:
 				opts->port = strtoul(optarg, &tmp_ptr, 10);
@@ -175,7 +220,11 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 }
 
 static void print_opts(struct server_opts *opts) {
-	print_debug_server(opts, "protocol:			%s", opts->tls ? "TLS" : "DTLS");
+	if (opts->no_tls) {
+		print_debug_server(opts, "protocol:			%s", opts->tcp ? "TCP" : "UDP");
+	} else {
+		print_debug_server(opts, "protocol:			%s", opts->tls ? "TLS" : "DTLS");
+	}
 	if (opts->port)
 		print_debug_server(opts, "port:			%u", opts->port);
 	else
