@@ -887,6 +887,93 @@ sockopt_unbinded_end:
 	return err;
 }
 
+static int verify_bind(void) {
+	int ksd_tls = 0;
+	int ksd_dtls = 0;
+	int sd = 0;
+	int ret;
+	struct sockaddr_ktls sa_ktls = {};
+
+	ksd_dtls = socket(AF_KTLS, SOCK_DGRAM, 0);
+	if (ksd_dtls < 0) {
+		perror("failed to create DTLS socket");
+		ret = errno;
+		goto verify_bind_end;
+	}
+
+	ksd_tls = socket(AF_KTLS, SOCK_STREAM, 0);
+	if (ksd_tls < 0) {
+		perror("failed to create TLS socket");
+		ret = errno;
+		goto verify_bind_end;
+	}
+
+	print_info("trying to bind unsupported adress family");
+	sd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sd < 0) {
+		perror("failed to create testing AF_UNIX socket");
+		ret = sd;
+		goto verify_bind_end;
+	}
+
+	sa_ktls.sa_cipher = KTLS_CIPHER_AES_GCM_128;
+	sa_ktls.sa_socket = sd;
+	sa_ktls.sa_version = KTLS_VERSION_1_2;
+
+	ret = bind(ksd_tls, (struct sockaddr *) &sa_ktls, sizeof(sa_ktls));
+	if (!ret) {
+		print_error("bind(2) to unsupported socket passed for TLS!");
+		goto verify_bind_end;
+	} else {
+		perror("bind");
+		print_info("correctly propagated error for unsupported socket bind");
+	}
+
+	ret = bind(ksd_dtls, (struct sockaddr *) &sa_ktls, sizeof(sa_ktls));
+	if (!ret) {
+		print_error("bind(2) to unsupported socket passed for DTLS!");
+		goto verify_bind_end;
+	} else {
+		perror("bind");
+		print_info("correctly propagated error for unsupported socket bind");
+	}
+
+	close(sd);
+
+	print_info("testing whether TLS over UDP is correctly rejected");
+	sd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sd < 0) {
+		perror("failed to create testing AF_UNIX socket");
+		ret = sd;
+		goto verify_bind_end;
+	}
+
+	sa_ktls.sa_socket = sd;
+	ret = bind(ksd_tls, (struct sockaddr *) &sa_ktls, sizeof(sa_ktls));
+	if (!ret) {
+		print_error("bind(2) did not rejected TLS over UDP");
+		goto verify_bind_end;
+	} else {
+		perror("bind");
+		print_info("correctly propagated error for unsupported TLS over UDP");
+	}
+
+
+	ret = 0;
+
+verify_bind_end:
+	if (ksd_tls)
+		close(ksd_tls);
+
+	if (ksd_dtls)
+		close(ksd_dtls);
+
+	if (sd)
+		close(sd);
+
+	return ret;
+}
+
 extern int verify_handling(int ksd, bool tls) {
 	// TODO: sockopt_{iv,key,salt} can be merged into one
 	int err;
@@ -964,6 +1051,18 @@ extern int verify_handling(int ksd, bool tls) {
 	} else {
 		print_info("tls_setsockopt()/tls_getsockopt() on unbinded socket passed");
 	}
+
+	/*
+	 * Verify passed socket type
+	 */
+	err = verify_bind();
+	if (err < 0) {
+		print_error("failed to verify correct behaviour for various bound socket types");
+		goto verify_handling_end;
+	} else {
+		print_info("tests on bound socket passed");
+	}
+
 
 	print_info("vefify handling passed, the connection will not be closed "
 					"properly since socket state is tainted");
