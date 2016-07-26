@@ -1,4 +1,4 @@
-CC = gcc
+CC = gcc -std=gnu99 -g
 CFLAGS = -Wall -pedantic -O2
 LDFLAGS = -lgnutls -lpthread
 
