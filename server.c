@@ -141,7 +141,7 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 	int ksd = 0;
 	socklen_t cli_addr_size_tmp;
 
-	ksd = ktls_socket_init(session, sd, 0, opts->tls);
+	ksd = ktls_socket_init(session, sd, 0, opts->tls, 0);
 	if (ksd < 0) {
 		print_error("failed to make AF_KTLS socket on server");
 		return ksd;

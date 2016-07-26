@@ -94,7 +94,7 @@ update_state_error:
 	return err;
 }
 
-extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool tls) {
+extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool tls, bool offload) {
 	int err;
 	struct sockaddr_ktls sa_ktls;
 
@@ -117,6 +117,15 @@ extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mt
 	err = ktls_socket_update_state(session, ksd, tls);
 	if (err < 0)
 		goto init_error;
+
+	if (offload) {
+		int offload_temp = 1;
+		err = setsockopt(ksd, AF_KTLS, KTLS_SET_OFFLOAD, &offload_temp, sizeof(offload_temp));
+		if (err < 0) {
+			print_error("failed to enable offload using setsockopt(2)");
+			goto init_error;
+		}
+	}
 
 	if (sendfile_mtu) {
 		err = setsockopt(ksd, AF_KTLS, KTLS_SET_MTU, &sendfile_mtu, sizeof(sendfile_mtu));

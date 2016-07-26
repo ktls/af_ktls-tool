@@ -93,6 +93,7 @@
 #define OPT_PLAIN_SENDFILE_MMAP   0x2E
 #define OPT_TCP                   0x2F
 #define OPT_UDP                   0x30
+#define OPT_OFFLOAD               0x31
 #define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:\x2B:\x2C:\x2D:\x2E:\x2F\x30"
 
 static int thread_server_port = 0;
@@ -139,6 +140,7 @@ static struct option long_options[] = {
 	/* 0x2E */{"plain-sendfile-mmap",   required_argument,  0,  OPT_PLAIN_SENDFILE_MMAP},
 	/* 0x2F */{"tcp",                   no_argument,        0,  OPT_TCP},
 	/* 0x30 */{"udp",                   no_argument,        0,  OPT_UDP},
+	/* 0x31 */{"offload",               no_argument,        0,  OPT_OFFLOAD},
 	{0, 0, 0, 0}
 };
 
@@ -244,6 +246,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->plain_sendfile_user = NULL;
 	opts->plain_sendfile_mmap = NULL;
 	opts->plain_splice_emu = NULL;
+	opts->offload = 0;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -256,6 +259,9 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			break;
 
 		switch (c) {
+			case OPT_OFFLOAD:
+				opts->offload = 1;
+				break;
 			case OPT_TLS:
 				if (protocol_seen) {
 					print_error("option '--dtls' is disjoint with --tls");
@@ -927,7 +933,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 			|| opts->send_ktls_time || opts->send_gnutls_time || opts->splice_time
 			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify
 			|| opts->splice_send_raw_time) {
-		ksd = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, opts->tls);
+		ksd = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, opts->tls, opts->offload);
 		if (ksd < 0) {
 			print_error("failed to get AF_KTLS socket");
 			goto action_error;

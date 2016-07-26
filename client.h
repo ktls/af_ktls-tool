@@ -54,6 +54,7 @@ struct client_opts {
 	const char *output;
 	bool server_no_echo;
 	unsigned server_mtu;
+	unsigned offload;
 	unsigned raw_send_time;
 	unsigned splice_send_raw_time;
 	const char *plain_sendfile;
