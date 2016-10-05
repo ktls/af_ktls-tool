@@ -132,7 +132,7 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 		if (opts->store_file)
 			write(opts->store_file, buffer, ret);
 	}
-
+	printf("server loop done\n");
 	return ret < 0 ? ret : 0;
 }
 
