@@ -175,7 +175,6 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 	}
 
 ktls_loop_end:
-	ktls_socket_update_state(session, ksd, opts->tls);
 	if (ksd)
 		ktls_socket_destruct(ksd, session);
 	return err < 0 ? err : 0;

@@ -18,7 +18,8 @@
 
 #include "ktls.h"
 
-extern int ktls_socket_update_state(gnutls_session_t session, int ksd, bool tls) {
+static int ktls_socket_update_state(gnutls_session_t session, int ksd, bool tls)
+{
 	int err;
 	gnutls_datum_t mac_key;
 	gnutls_datum_t iv_read;
