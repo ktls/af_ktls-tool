@@ -14,7 +14,6 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "af_ktls/af_ktls.h"
 
 #include "ktls.h"
 

@@ -22,8 +22,6 @@
 #include <sys/socket.h>
 #include <sys/user.h>
 
-#include "af_ktls/af_ktls.h"
-
 #include "common.h"
 #include "verify.h"
 
