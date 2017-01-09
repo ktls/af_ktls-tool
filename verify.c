@@ -29,9 +29,6 @@
 #define DTLS_OVERHEAD               (13 + 8 + 16) // TODO: rewrite
 #define TLS_OVERHEAD                (5 + 8 + 16)  // TODO: rewrite
 #define MIN(X, Y)                   ((X) > (Y) ? (Y) : (X))
-#define AES128_GCM_KEY_SIZE          ((size_t) 16)
-#define AES128_GCM_IV_SIZE           ((size_t)8)
-#define AES128_GCM_SALT_SIZE         ((size_t)4)
 
 static int pipe_write(int ksd, char *mem_send, size_t send_size, char *mem_recv, size_t recv_size, unsigned mtu) {
 	int err;
@@ -128,11 +125,13 @@ extern int verify_sendpage(int ksd, bool tls) {
 	print_info("verifying tls_sendpage() implementation, page size == %ld", PAGE_SIZE);
 
 	mtu = TLS_PAYLOAD_MAX_LEN;
+#ifdef TLS_SET_MTU
 	err = setsockopt(ksd, AF_KTLS, KTLS_SET_MTU, &mtu, sizeof(mtu));
 	if (err < 0) {
 		perror("failed to perform setsockopt()");
 		goto verify_sendpage_end;
 	}
+#endif
 
 	size = PAGE_SIZE >> 1;
 	err = pipe_write(ksd, mem_send, size, mem_recv, size, mtu);
@@ -160,11 +159,13 @@ extern int verify_sendpage(int ksd, bool tls) {
 	}
 
 	mtu = 100;
+#ifdef TLS_SET_MTU
 	err = setsockopt(ksd, AF_KTLS, KTLS_SET_MTU, &mtu, sizeof(mtu));
 	if (err < 0) {
 		perror("failed to perform setsockopt()");
 		goto verify_sendpage_end;
 	}
+#endif
 
 	size = PAGE_SIZE;
 	err = pipe_write(ksd, mem_send, size, mem_recv, size, mtu);
@@ -428,6 +429,7 @@ verify_splice_read_end:
 	return err;
 }
 
+#ifdef TLS_VERIFY_HANDLING
 static int sockopt_iv(int ksd, bool recv) {
 	int err;
 	const int optname_set = recv ? KTLS_SET_IV_RECV : KTLS_SET_IV_SEND;
@@ -971,4 +973,4 @@ extern int verify_handling(int ksd, bool tls) {
 verify_handling_end:
 	return err;
 }
-
+#endif

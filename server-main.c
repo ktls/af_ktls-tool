@@ -170,7 +170,6 @@ static int parse_opts(struct server_opts *opts, int argc, char *argv[]) {
 					return 1;
 				}
 				break;
-
 			case OPT_STORE:
 				if (opts->store_file) {
 					print_error("multiple --store supplied");

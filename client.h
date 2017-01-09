@@ -56,7 +56,9 @@ struct client_opts {
 	unsigned server_mtu;
 	unsigned offload;
 	unsigned raw_send_time;
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	unsigned splice_send_raw_time;
+#endif
 	const char *plain_sendfile;
 	const char *plain_sendfile_user;
 	const char *plain_sendfile_mmap;

@@ -137,18 +137,22 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 }
 
 static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t session, int sd, struct sockaddr *cli_addr, socklen_t cli_addr_size, char *buf) {
-	int err;
-	int ksd = 0;
+	int tls_init = false, err;
 	socklen_t cli_addr_size_tmp;
 
-	ksd = ktls_socket_init(session, sd, 0, opts->tls, 0);
-	if (ksd < 0) {
+#ifdef TLS_SET_MTU
+	err = ktls_socket_init(session, sd, 0, false, opts->tls, false);
+#else
+	err = ktls_socket_init(session, sd, false, opts->tls, false);
+#endif
+	if (err < 0) {
 		print_error("failed to make AF_KTLS socket on server");
-		return ksd;
+		return -1;
 	}
+	tls_init = true;
 
 	for (;;) {
-		err = recvfrom(ksd, buf, opts->mtu, 0, cli_addr, &cli_addr_size_tmp);
+		err = recvfrom(sd, buf, opts->mtu, 0, cli_addr, &cli_addr_size_tmp);
 		if (err < 0) {
 			perror("recv");
 			print_error("probably not data packet, fallback to Gnu TLS");
@@ -165,7 +169,7 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 			write(opts->store_file, buf, err);
 
 		if (!opts->no_echo) {
-			err = sendto(ksd, buf, err, 0, cli_addr, cli_addr_size);
+			err = sendto(sd, buf, err, 0, cli_addr, cli_addr_size);
 			if (err < 0) {
 				perror("send");
 				print_error("failed to sent to AF_KTLS on server");
@@ -175,8 +179,8 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 	}
 
 ktls_loop_end:
-	if (ksd)
-		ktls_socket_destruct(ksd, session);
+	if (tls_init)
+		ktls_socket_destruct(session, sd, false, false);
 	return err < 0 ? err : 0;
 }
 

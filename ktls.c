@@ -12,14 +12,20 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "common.h"
-
 #include "ktls.h"
 
-static int ktls_socket_update_state(gnutls_session_t session, int ksd, bool tls)
+#include <linux/tls.h>
+
+# define SOL_TCP		6	/* TCP level */
+
+
+static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool send, bool tls, bool offload)
 {
-	int err;
+	struct tls_crypto_info_aes_gcm_128 crypto_info;
+	int optname, rc = -1;
 	gnutls_datum_t mac_key;
 	gnutls_datum_t iv_read;
 	gnutls_datum_t iv_write;
@@ -29,104 +35,147 @@ static int ktls_socket_update_state(gnutls_session_t session, int ksd, bool tls)
 	unsigned char seq_number_write[8];
 
 	// now we need to initialize state after the handshake in the kernel
-	err = gnutls_record_get_state(session, 1, &mac_key, &iv_read, &cipher_key_read, seq_number_read);
-	if (err < 0) {
+	rc = gnutls_record_get_state(session, 1, &mac_key, &iv_read, &cipher_key_read, seq_number_read);
+	if (rc < 0) {
 		print_error("failed to get receiving state from Gnu TLS session");
-		goto update_state_error;
+		goto err;
 	}
 
-	err = gnutls_record_get_state(session, 0, &mac_key, &iv_write, &cipher_key_write, seq_number_write);
-	if (err < 0) {
+	rc = gnutls_record_get_state(session, 0, &mac_key, &iv_write, &cipher_key_write, seq_number_write);
+	if (rc < 0) {
 		print_error("failed to get sendig state from Gnu TLS session");
-		goto update_state_error;
+		goto err;
 	}
 
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_SALT_SEND, iv_write.data, 4);
-	if (err < 0) {
-		perror("failed to set send salt on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
+	memset(&crypto_info, 0, sizeof(crypto_info));
+
+	/* version is hardcoded for now */
+	crypto_info.info.version = TLS_1_2_VERSION;
+
+	/* cipher type is hardcoded for now
+	 * TODO: [AY] get it from certificate */
+	crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
+
+	/* for now we always work in HW offload mode */
+	if (!offload) {
+		print_error("kernel tls support only offload mode for now");
+		goto err;
+	}
+	crypto_info.info.offload_state = TLS_OFFLOAD_STATE_HW;
+
+	if (send) {
+		memcpy(crypto_info.iv, seq_number_write, TLS_CIPHER_AES_GCM_128_IV_SIZE);
+		if (cipher_key_write.size != TLS_CIPHER_AES_GCM_128_KEY_SIZE) {
+			print_error("mismatch in send key size");
+			goto err;
+		}
+		memcpy(crypto_info.key, cipher_key_write.data, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
+		memcpy(crypto_info.salt, iv_write.data, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
+		optname = TCP_TLS_TX;
+	} else {
+		/*
+		 * Gnu TLS this is a workaround since Gnu TLS does not propagate recv seq num
+		 * for DTLS.
+		 * It should be fixed in the new release (today is Apr 1 2016). Once fixed,
+		 * this has to be removed.
+		 */
+		if (!tls) {
+			seq_number_read[1] = 1;
+			seq_number_read[7] = 1;
+		}
+		memcpy(crypto_info.iv, seq_number_read, TLS_CIPHER_AES_GCM_128_IV_SIZE);
+		if (cipher_key_read.size != TLS_CIPHER_AES_GCM_128_KEY_SIZE) {
+			print_error("mismatch in recv key size");
+			goto err;
+		}
+		memcpy(crypto_info.key, cipher_key_read.data, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
+		memcpy(crypto_info.salt, iv_read.data, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
+		optname = TCP_TLS_RX;
 	}
 
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_SALT_RECV, iv_read.data, 4);
-	if (err < 0) {
-		perror("failed to set recv salt on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
-	}
-
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_KEY_SEND, cipher_key_write.data, cipher_key_write.size);
-	if (err < 0) {
-		perror("failed to set send key on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
-	}
-
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_KEY_RECV, cipher_key_read.data, cipher_key_read.size);
-	if (err < 0) {
-		perror("failed to set receive key on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
-	}
-
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_IV_SEND, seq_number_write, 8);
-	if (err < 0) {
-		print_error("failed to set send IV on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
-	}
-
-	/*
-	 * Gnu TLS this is a workaround since Gnu TLS does not propagate recv seq num
-	 * for DTLS.
-	 * It should be fixed in the new release (today is Apr 1 2016). Once fixed,
-	 * this has to be removed.
-	 */
-	if (!tls) {
-		seq_number_read[1] = 1;
-		seq_number_read[7] = 1;
-	}
-
-	err = setsockopt(ksd, AF_KTLS, KTLS_SET_IV_RECV, seq_number_read, 8);
-	if (err < 0) {
-		print_error("failed to set receive IV on AF_KTLS socket using setsockopt(2)");
-		goto update_state_error;
+	rc = setsockopt(ksd, SOL_TCP, optname, &crypto_info, sizeof(crypto_info));
+	if (rc < 0) {
+		print_error("failed to set send crypto info using setsockopt(2)");
+		goto err;
 	}
 
 	return 0;
 
-update_state_error:
-	return err;
+err:
+	return rc;
 }
 
-extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool tls, bool offload) {
+static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool send, bool offload)
+{
+	struct tls_crypto_info_aes_gcm_128 crypto_info;
+	int optname, rc = -1;
+	socklen_t optlen = sizeof(crypto_info);
+
+	if (send) {
+		optname = TCP_TLS_TX;
+	} else {
+		optname = TCP_TLS_RX;
+	}
+
+	memset(&crypto_info, 0, sizeof(crypto_info));
+
+	rc = getsockopt(ksd, SOL_TCP, optname, &crypto_info, &optlen);
+	if (rc < 0) {
+		print_error("failed to get send crypto info using getsockopt(2)");
+		goto err;
+	}
+
+	/* check version */
+	if (crypto_info.info.version != TLS_1_2_VERSION) {
+		print_error("incorrect version queried");
+		goto err;
+	}
+
+	/* check cipher */
+	if (crypto_info.info.cipher_type != TLS_CIPHER_AES_GCM_128) {
+		print_error("incorrect cipher type queried");
+		goto err;
+	}
+
+	/* check offload state */
+	if (offload && crypto_info.info.offload_state != TLS_OFFLOAD_STATE_HW) {
+		print_error("incorrect offload state queried");
+		goto err;
+	}
+	if (!offload && crypto_info.info.offload_state != TLS_OFFLOAD_STATE_SW) {
+		print_error("incorrect offload state queried");
+		goto err;
+	}
+
+	/* we set only sequence number */
+	rc = gnutls_record_set_state(session, !send, crypto_info.iv);
+	if (rc) {
+		print_error("failed to set receive IV on Gnu TLS's session");
+		goto err;
+	}
+
+	return 0;
+
+err:
+	return rc;
+}
+
+
+#ifdef TLS_SET_MTU
+extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool send, bool tls, bool offload)
+#else
+extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tls, bool offload)
+#endif
+{
 	int err;
-	struct sockaddr_ktls sa_ktls;
 
-	int ksd = socket(AF_KTLS, tls ? SOCK_STREAM : SOCK_DGRAM, 0);
-	if (ksd == -1) {
-		perror("socket error:");
-		return -1;
+	err = ktls_socket_set_crypto_state(session, sd, send, tls, offload);
+	if (err) {
+		print_error("failed to set crypto state");
+		goto set_crypto_error;
 	}
 
-	sa_ktls.sa_cipher = KTLS_CIPHER_AES_GCM_128;
-	sa_ktls.sa_socket = sd; // bind to this socket
-	sa_ktls.sa_version = KTLS_VERSION_1_2;
-
-	err = bind(ksd, (struct sockaddr *) &sa_ktls, sizeof(sa_ktls));
-	if (err < 0) {
-		perror("failed to bind TCP/UCP socket");
-		goto init_error;
-	}
-
-	err = ktls_socket_update_state(session, ksd, tls);
-	if (err < 0)
-		goto init_error;
-
-	if (offload) {
-		int offload_temp = 1;
-		err = setsockopt(ksd, AF_KTLS, KTLS_SET_OFFLOAD, &offload_temp, sizeof(offload_temp));
-		if (err < 0) {
-			print_error("failed to enable offload using setsockopt(2)");
-			goto init_error;
-		}
-	}
-
+#ifdef TLS_SET_MTU
 	if (sendfile_mtu) {
 		err = setsockopt(ksd, AF_KTLS, KTLS_SET_MTU, &sendfile_mtu, sizeof(sendfile_mtu));
 		if (err < 0) {
@@ -135,52 +184,26 @@ extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mt
 			goto init_error;
 		}
 	}
+#endif
 
-	return ksd;
-
-init_error:
-	close(ksd);
-	return -1;
-}
-
-extern int ktls_socket_destruct(int ksd, gnutls_session_t session) {
-	const int iv_len = 8;
-	int err;
-	unsigned char new_iv[iv_len];
-
-	err = getsockopt(ksd, AF_KTLS, KTLS_GET_IV_SEND, new_iv, (socklen_t *) &iv_len);
-	if (err < 0) {
-		perror("getsockopt");
-		print_error("failed to get send IV from AF_KTLS socket");
-		goto destruct_error;
-	}
-
-	// we set only sequence number
-	err = gnutls_record_set_state(session, 0, new_iv);
-	if (err) {
-		print_error("failed to set send IV on Gnu TLS's session");
-		goto destruct_error;
-	}
-
-	err = getsockopt(ksd, AF_KTLS, KTLS_GET_IV_RECV, new_iv, (socklen_t *) &iv_len);
-	if (err < 0) {
-		print_error("failed to get receive IV from AF_KTLS socket");
-		goto destruct_error;
-	}
-
-	// we set only sequence number
-	err = gnutls_record_set_state(session, 1, new_iv);
-	if (err) {
-		print_error("failed to set receive IV on Gnu TLS's session");
-		goto destruct_error;
-	}
-
-	close(ksd);
 	return 0;
 
-destruct_error:
-	// we close kernel TLS socket anyway...
-	close(ksd);
-	return -1;
+set_crypto_error:
+	return err;
 }
 
+extern int ktls_socket_destruct(gnutls_session_t session, int sd, bool send, bool offload)
+{
+	int err;
+
+	err = ktls_socket_get_crypto_state(session, sd, send, offload);
+	if (err < 0) {
+		print_error("failed to get crypto state");
+		goto get_crypto_error;
+	}
+
+	return 0;
+
+get_crypto_error:
+	return err;
+}

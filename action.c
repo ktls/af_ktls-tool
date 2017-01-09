@@ -229,7 +229,9 @@ static void print_sendfile_mmap_stats(const struct client_opts *opts, size_t fil
 		print_stats(json_msg,
 				opts->sendfile_mmap,
 				filesize,
+#ifdef TLS_SET_MTU
 				opts->sendfile_mtu,
+#endif
 				total_sent,
 				clocks);
 	else
@@ -263,7 +265,9 @@ static void print_sendfile_user_stats(const struct client_opts *opts, size_t fil
 		print_stats(json_msg,
 				opts->sendfile_user,
 				filesize,
+#ifdef TLS_SET_MTU
 				opts->sendfile_mtu,
+#endif
 				total_sent,
 				clocks);
 	else
@@ -296,7 +300,9 @@ static void print_sendfile_stats(const struct client_opts *opts, size_t filesize
 		print_stats(json_msg,
 				opts->sendfile,
 				filesize,
+#ifdef TLS_SET_MTU
 				opts->sendfile_mtu,
+#endif
 				total_sent,
 				clocks);
 	else
@@ -358,7 +364,9 @@ static void print_splice_send_raw_time_stats(const struct client_opts *opts, siz
 	if (opts->json)
 		print_stats(json_msg,
 				opts->payload_size,
+#ifdef TLS_SET_MTU
 				opts->sendfile_mtu,
+#endif
 				total_sent,
 				total_recv,
 				clocks);
@@ -426,8 +434,15 @@ static void print_plain_stats(const struct client_opts *opts, const char *testna
 
 	const char *msg = opts->json ? json_msg : txt_msg;
 
-	print_stats(msg, testname, opts->sendfile_size, opts->sendfile_mtu,
-			filename, total_sent, total_recv, elapsed);
+	print_stats(msg, testname,
+			opts->sendfile_size,
+#ifdef TLS_SET_MTU
+			opts->sendfile_mtu,
+#endif
+			filename,
+			total_sent,
+			total_recv,
+			elapsed);
 }
 
 extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnutls_session_t session, int flags) {
@@ -637,6 +652,7 @@ out:
 }
 
 
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 extern int do_splice_send_raw_time(const struct client_opts *opts, int raw_sd, int ksd, void *mem) {
 	int err;
 	int ret;
@@ -714,6 +730,7 @@ out:
 
 	return err;
 }
+#endif
 
 
 extern int do_splice_time(const struct client_opts *opts, int ksd) {
@@ -968,7 +985,11 @@ extern int do_sendfile_mmap(const struct client_opts *opts, gnutls_session_t ses
 	}
 
 	for (total = 0; total != filesize; total += err) {
+#ifdef TLS_SET_MTU
 		err = gnutls_record_send(session, buf + total, MIN(opts->sendfile_mtu, filesize - total));
+#else
+		err = gnutls_record_send(session, buf + total, filesize - total);
+#endif
 		if (err < 0) {
 			print_error("failed to send via Gnu TLS");
 			goto out;
@@ -1398,10 +1419,14 @@ extern int do_plain_sendfile(const struct client_opts *opts, int sd) {
 	} else
 		filesize = opts->sendfile_size;
 
+#ifdef TLS_SET_MTU
 	if (opts->sendfile_mtu)
 		mtu = MIN(filesize, opts->sendfile_mtu);
 	else
 		mtu = filesize;
+#else
+	mtu = filesize;
+#endif
 
 	// we do this explicitly because of get_file_size()
 	DO_DROP_CACHES(opts);

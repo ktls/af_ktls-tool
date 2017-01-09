@@ -80,13 +80,17 @@
 #define OPT_VERIFY_SENDPAGE       0x21
 #define OPT_VERIFY_TRANSMISSION   0x22
 #define OPT_VERIFY_SPLICE_READ    0x23
+#ifdef TLS_VERIFY_HANDLING
 #define OPT_VERIFY_HANDLING       0x24
+#endif
 #define OPT_OUTPUT                'o'
 #define OPT_SENDFILE_USER         0x26
 #define OPT_SERVER_NO_ECHO        0x27
 #define OPT_SERVER_MTU            0x28
 #define OPT_RAW_SEND_TIME         0x29
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 #define OPT_SPLICE_SEND_RAW_TIME  0x2A
+#endif
 #define OPT_PLAIN_SENDFILE        0x2B
 #define OPT_PLAIN_SENDFILE_USER   0x2C
 #define OPT_PLAIN_SPLICE_EMU      0x2D
@@ -127,13 +131,17 @@ static struct option long_options[] = {
 	/* 0x21 */{"verify-sendpage",       no_argument,        0,  OPT_VERIFY_SENDPAGE},
 	/* 0x22 */{"verify-transmission",   no_argument,        0,  OPT_VERIFY_TRANSMISSION},
 	/* 0x23 */{"verify-splice-read",    no_argument,        0,  OPT_VERIFY_SPLICE_READ},
+#ifdef TLS_VERIFY_HANDLING
 	/* 0x24 */{"verify-handling",       no_argument,        0,  OPT_VERIFY_HANDLING},
+#endif
 	/* -o   */{"output",                required_argument,  0,  OPT_OUTPUT},
 	/* -o   */{"sendfile-user",         required_argument,  0,  OPT_SENDFILE_USER},
 	/* 0x27 */{"server-no-echo",        no_argument,        0,  OPT_SERVER_NO_ECHO},
 	/* 0x28 */{"server-mtu",            required_argument,  0,  OPT_SERVER_MTU},
 	/* 0x29 */{"raw-send-time",         required_argument,  0,  OPT_RAW_SEND_TIME},
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	/* 0x2A */{"splice-send-raw-time",  required_argument,  0,  OPT_SPLICE_SEND_RAW_TIME},
+#endif
 	/* 0x2B */{"plain-sendfile",        required_argument,  0,  OPT_PLAIN_SENDFILE},
 	/* 0x2C */{"plain-sendfile-user",   required_argument,  0,  OPT_PLAIN_SENDFILE_USER},
 	/* 0x2D */{"plain-splice-emu",      required_argument,  0,  OPT_PLAIN_SPLICE_EMU},
@@ -184,12 +192,16 @@ static void print_help(char *progname) {
 		"\t--splice-file FILE           specify file to be used with --splice-{count,time}\n"
 		"\t--splice-echo-count COUNT    perform echo splice(2) with server COUNT times\n"
 		"\t--splice-echo-time TIME      perform echo splice(2) with server TIME secs\n"
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 		"\t--splice-send-raw-time TIME  perform splice(2) on AF_KTLS and send raw data\n"
+#endif
 		"\n"
 		"\t--verify-sendpage            verify tls_sendpage() kernel implementation\n"
 		"\t--verify-transmission        verify tls_sendmsg(), tls_recvmsg() kernel implementation\n"
 		"\t--verify-splice-read         verify tls_splice_read() kernel implementation\n"
+#ifdef TLS_VERIFY_HANDLING
 		"\t--verify-handling            verify tls_setsockopt()/tls_getsockopt() kernel implementation\n"
+#endif
 		"\n"
 		"\t--plain-sendfile FILE        send file FILE unencrypted using sendfile(2)\n"
 		"\t--plain-sendfile-user FILE   send file FILE unencrypted using read(2) and send(2)\n"
@@ -241,7 +253,9 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->sendfile_user = NULL;
 	opts->server_no_echo = false;
 	opts->raw_send_time = 0;
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	opts->splice_send_raw_time = 0;
+#endif
 	opts->plain_sendfile = NULL;
 	opts->plain_sendfile_user = NULL;
 	opts->plain_sendfile_mmap = NULL;
@@ -370,7 +384,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 					return -1;
 				}
 				break;
-
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 			case OPT_SPLICE_SEND_RAW_TIME:
 				opts->splice_send_raw_time = strtoul(optarg, &tmp_ptr, 10);
 				if (*tmp_ptr != '\0' || opts->splice_send_raw_time == 0) {
@@ -378,6 +392,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 					return -1;
 				}
 				break;
+#endif
 			case OPT_SENDFILE_MTU:
 				opts->sendfile_mtu = strtoul(optarg, &tmp_ptr, 10);
 				if (*tmp_ptr != '\0' || opts->sendfile_mtu == 0) {
@@ -540,9 +555,11 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			case OPT_VERIFY_SPLICE_READ:
 				opts->verify |= VERIFY_SPLICE_READ;
 				break;
+#ifdef TLS_VERIFY_HANDLING
 			case OPT_VERIFY_HANDLING:
 				opts->verify |= VERIFY_HANDLING;
 				break;
+#endif
 			case OPT_SENDFILE_USER:
 				if (opts->sendfile_user) {
 					print_error("multiple --sendfile-user supplied");
@@ -589,8 +606,12 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->plain_sendfile &&
 			!opts->plain_sendfile_user &&
 			!opts->plain_sendfile_mmap &&
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 			!opts->plain_splice_emu &&
 			!opts->splice_send_raw_time) {
+#else
+			!opts->plain_splice_emu) {
+#endif
 		if (!opts->verify) {
 			print_error("specify at least one benchamrking or verification option");
 			return -1;
@@ -618,7 +639,11 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			opts->sendfile_mmap ||
 			opts->sendfile_user ||
 			opts->verify) {
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 		if (opts->raw_send_time || opts->splice_send_raw_time) {
+#else
+		if (opts->raw_send_time) {
+#endif
 			print_error("raw send tests can be run only as a standalone benchmark");
 			return -1;
 		}
@@ -664,11 +689,14 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			!opts->plain_sendfile &&
 			!opts->plain_sendfile_mmap &&
 			!opts->plain_sendfile_user &&
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 			!opts->splice_send_raw_time &&
+#endif
 			!opts->plain_splice_emu) {
 		print_error("invalid use of --sendfile-mtu");
 		return -1;
 	}
+
 
 	if (!opts->splice_count && !opts->splice_time && opts->splice_file) {
 		print_error("--splice-file can be used only with --splice-{time,count}");
@@ -769,8 +797,10 @@ static void print_opts(const struct client_opts *opts) {
 		print_debug_client(opts, "plain send file emulation using splice: %s", opts->plain_splice_emu);
 	if (opts->plain_sendfile_mmap)
 		print_debug_client(opts, "plain send file mmap(2): %s", opts->plain_splice_emu);
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	if (opts->splice_send_raw_time)
 		print_debug_client(opts, "raw splice send raw time: %u", opts->splice_send_raw_time);
+#endif
 	if (opts->server_store)
 		print_debug_client(opts, "server store file (fd):		'%s'", opts->server_store);
 	if (opts->sendfile)
@@ -866,14 +896,17 @@ out:
 }
 
 static int do_action(const struct client_opts *opts, gnutls_session_t session,  int udp_sd) {
-	int ksd = 0;
-	int err;
+	int tls_init = false, err;
 	char *mem = NULL; //just a bunch of zeroed memory used as a source data
 
 	if (opts->send_ktls_count || opts->send_gnutls_count ||
 			opts->send_ktls_time || opts->send_gnutls_time ||
 			opts->splice_echo_time || opts->splice_echo_count ||
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 			opts->raw_send_time || opts->splice_send_raw_time) {
+#else
+			opts->raw_send_time) {
+#endif
 		err = posix_memalign((void **) &mem, 16, opts->payload_size);
 		memset(mem, 0, opts->payload_size);
 		if (err) {
@@ -932,127 +965,140 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 	if (opts->send_ktls_count || opts->sendfile || opts->splice_count
 			|| opts->send_ktls_time || opts->send_gnutls_time || opts->splice_time
 			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 			|| opts->splice_send_raw_time) {
-		ksd = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, opts->tls, opts->offload);
-		if (ksd < 0) {
+#else
+			) {
+#endif
+#ifdef TLS_SET_MTU
+		err = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, true, opts->tls, opts->offload);
+#else
+		err = ktls_socket_init(session, udp_sd, true, opts->tls, opts->offload);
+#endif
+		if (err < 0) {
 			print_error("failed to get AF_KTLS socket");
 			goto action_error;
 		}
+		tls_init = true;
 		DO_DROP_CACHES(opts);
 	}
 
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	if (opts->splice_send_raw_time) {
 		err = do_splice_send_raw_time(opts, udp_sd, ksd, mem);
 		if (err < 0) {
 			print_error("failed to do splice raw send");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
+#endif
 
 	if (opts->splice_count) {
-		err = do_splice_count(opts, ksd);
+		err = do_splice_count(opts, udp_sd);
 		if (err < 0) {
 			print_error("failed to do splice(2)");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->splice_time) {
-		err = do_splice_time(opts, ksd);
+		err = do_splice_time(opts, udp_sd);
 		if (err < 0) {
 			print_error("failed to do splice(2) time");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->splice_echo_time) {
-		err = do_splice_echo_time(opts, ksd, mem);
+		err = do_splice_echo_time(opts, udp_sd, mem);
 		if (err < 0) {
 			print_error("failed to do splice(2) echo time");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->splice_echo_count) {
-		err = do_splice_echo_count(opts, ksd, mem);
+		err = do_splice_echo_count(opts, udp_sd, mem);
 		if (err < 0) {
 			print_error("failed to do splice(2) echo count");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->sendfile) {
-		err = do_sendfile(opts, ksd);
+		err = do_sendfile(opts, udp_sd);
 		if (err < 0) {
 			print_error("failed to do sendfile(2)");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->send_ktls_count) {
-		err = do_send_count(opts, ksd, mem, session, 0);
+		err = do_send_count(opts, udp_sd, mem, session, 0);
 		if (err < 0) {
 			print_error("failed to do AF_ALG send() count");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->send_ktls_time) {
-		err = do_send_time(opts, ksd, mem, 0);
+		err = do_send_time(opts, udp_sd, mem, 0);
 		if (err < 0) {
 			print_error("failed to do AF_ALG send() time");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->verify & VERIFY_SENDPAGE) {
-		err = verify_sendpage(ksd, opts->tls);
+		err = verify_sendpage(udp_sd, opts->tls);
 		if (err < 0) {
 			print_error("failed to verify tls_sendpage() in kernel");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->verify & VERIFY_TRANSMISSION) {
-		err = verify_transmission(ksd);
+		err = verify_transmission(udp_sd);
 		if (err < 0) {
 			print_error("failed to verify tls_sendmsg()/tls_recvmsg() in kernel");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
 	if (opts->verify & VERIFY_SPLICE_READ) {
-		err = verify_splice_read(ksd);
+		err = verify_splice_read(udp_sd);
 		if (err < 0) {
 			print_error("failed to verify tls_splice_read() in kernel");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
+#ifdef TLS_VERIFY_HANDLING
 	if (opts->verify & VERIFY_HANDLING) {
-		err = verify_handling(ksd, opts->tls);
+		err = verify_handling(udp_sd, opts->tls);
 		if (err < 0) {
 			print_error("failed to verify tls_getsockopt()/tls_setsockopt() in kernel");
-			goto action_error_ksd;
+			goto action_error_tls_init;
 		}
 		DO_DROP_CACHES(opts);
 	}
+#endif
 
 	err = 0;
-action_error_ksd:
-	if (ksd)
-		ktls_socket_destruct(ksd, session);
+action_error_tls_init:
+	if (tls_init)
+		ktls_socket_destruct(session, udp_sd, true, opts->offload);
 action_error:
 	if (mem)
 		free(mem);
@@ -1132,7 +1178,11 @@ static void client_opts2server_opts(const struct client_opts *client_opts,
 	server_opts->ktls = client_opts->server_ktls;
 	server_opts->no_echo = client_opts->server_no_echo;
 	server_opts->mtu = client_opts->server_mtu;
+#ifdef TLS_SPLICE_SEND_RAW_TIME
 	server_opts->raw_recv = (client_opts->raw_send_time || client_opts->splice_send_raw_time);
+#else
+	server_opts->raw_recv = client_opts->raw_send_time;
+#endif
 	server_opts->no_tls = (client_opts->plain_sendfile ||
 			client_opts->plain_sendfile_mmap ||
 			client_opts->plain_sendfile_user ||
