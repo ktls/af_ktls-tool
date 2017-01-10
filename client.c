@@ -769,7 +769,7 @@ static void print_opts(const struct client_opts *opts) {
 		print_debug_client(opts, "plain send file emulation using splice: %s", opts->plain_splice_emu);
 	if (opts->plain_sendfile_mmap)
 		print_debug_client(opts, "plain send file mmap(2): %s", opts->plain_splice_emu);
-	if (opts->raw_send_time)
+	if (opts->splice_send_raw_time)
 		print_debug_client(opts, "raw splice send raw time: %u", opts->splice_send_raw_time);
 	if (opts->server_store)
 		print_debug_client(opts, "server store file (fd):		'%s'", opts->server_store);
