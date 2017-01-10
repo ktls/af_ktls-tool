@@ -878,7 +878,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		memset(mem, 0, opts->payload_size);
 		if (err) {
 			perror("posix_memalign");
-			return err;
+			return -1;
 		}
 	}
 
@@ -924,7 +924,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = do_raw_send_time(opts, session, udp_sd, mem);
 		if (err < 0) {
 			print_error("failed to do raw send");
-			goto action_error_ksd;
+			goto action_error;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -999,7 +999,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = do_send_count(opts, ksd, mem, session, 0);
 		if (err < 0) {
 			print_error("failed to do AF_ALG send() count");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -1008,7 +1008,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = do_send_time(opts, ksd, mem, 0);
 		if (err < 0) {
 			print_error("failed to do AF_ALG send() time");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -1017,7 +1017,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = verify_sendpage(ksd, opts->tls);
 		if (err < 0) {
 			print_error("failed to verify tls_sendpage() in kernel");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -1026,7 +1026,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = verify_transmission(ksd);
 		if (err < 0) {
 			print_error("failed to verify tls_sendmsg()/tls_recvmsg() in kernel");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -1035,7 +1035,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = verify_splice_read(ksd);
 		if (err < 0) {
 			print_error("failed to verify tls_splice_read() in kernel");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
@@ -1044,34 +1044,19 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		err = verify_handling(ksd, opts->tls);
 		if (err < 0) {
 			print_error("failed to verify tls_getsockopt()/tls_setsockopt() in kernel");
-			goto action_error;
+			goto action_error_ksd;
 		}
 		DO_DROP_CACHES(opts);
 	}
 
-	if (ksd) {
-		err = ktls_socket_destruct(ksd, session);
-		if (err) {
-			// but there is nothing to do with it now...
-			print_error("failed to destruct AF_KTLS socket");
-			goto action_error;
-		}
-	}
-
-	if (mem)
-		free(mem);
-
-	return 0;
-
+	err = 0;
 action_error_ksd:
 	if (ksd)
 		ktls_socket_destruct(ksd, session);
-
 action_error:
 	if (mem)
 		free(mem);
-
-	return -1;
+	return err;
 }
 
 static int run_client(const struct client_opts *opts) {
