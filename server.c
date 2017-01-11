@@ -638,7 +638,10 @@ static int tls_run_server(struct server_opts *opts) {
 			server_gnutls_loop(opts, session, buffer, sd);
 		}
 
-		/* do not wait for the peer to close the connection.
+		/*
+		 * do not wait for the peer to close the connection.
+		 * This is ok, server will send shutdown with old tcp send op
+		 * since it only moved to offload on recv side
 		 */
 		gnutls_bye(session, GNUTLS_SHUT_WR);
 
