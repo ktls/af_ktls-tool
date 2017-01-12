@@ -78,6 +78,7 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 			do {
 				ret = gnutls_record_recv_seq(session, buffer, opts->mtu, sequence);
 			} while (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED);
+			print_info("gnutls_record_recv_seq, ret=%d\n", ret);
 		} else {
 			ret = recv(sd, buffer, opts->mtu, 0);
 			if (ret < 0) {
