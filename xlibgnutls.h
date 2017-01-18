@@ -18,7 +18,7 @@ extern int xlibgnutls_dtls_handshake(gnutls_session_t *session, int udp_sd, unsi
 extern int xlibgnutls_dtls_terminate(gnutls_session_t session);
 
 extern int xlibgnutls_tls_handshake(gnutls_session_t *session, int tcp_sd, unsigned verbose_level);
-extern int xlibgnutls_tls_terminate(gnutls_session_t session);
+extern int xlibgnutls_tls_terminate(gnutls_session_t session, bool offload);
 
 #endif // XLIBGNUTLS_H_
 

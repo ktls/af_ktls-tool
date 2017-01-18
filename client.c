@@ -1151,7 +1151,7 @@ static int run_client(const struct client_opts *opts) {
 		err = do_action(opts, session, sd);
 
 		if (opts->tls)
-			xlibgnutls_tls_terminate(session);
+			xlibgnutls_tls_terminate(session, opts->offload);
 		else
 			xlibgnutls_dtls_terminate(session);
 	}

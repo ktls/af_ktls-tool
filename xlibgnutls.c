@@ -19,6 +19,9 @@
 #include "xlibgnutls.h"
 #include "connection.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 // this is ugly, but let's simplify things
 static gnutls_certificate_credentials_t xcred;
 static gnutls_anon_client_credentials_t anoncred;
@@ -147,11 +150,35 @@ extern int xlibgnutls_tls_handshake(gnutls_session_t *session, int tcp_sd, unsig
 	return ret;
 }
 
-extern int xlibgnutls_tls_terminate(gnutls_session_t session) {
-#if 0
-	/* TODO: [AY] need to fix shutdown to be sent with new alert sendMsg
-	   gnutls_bye(session, GNUTLS_SHUT_WR); */
-#endif
+/* Record Protocol */
+typedef enum content_type_t {
+	GNUTLS_CHANGE_CIPHER_SPEC = 20, GNUTLS_ALERT,
+	GNUTLS_HANDSHAKE, GNUTLS_APPLICATION_DATA,
+	GNUTLS_HEARTBEAT
+} content_type_t;
+
+
+static int xlibgnutls_bye(gnutls_session_t session, bool offload)
+{
+	if (!offload) {
+		gnutls_bye(session, GNUTLS_SHUT_WR);
+	} else {
+		/* HACK to send control message directly from the tool
+		 * TODO: Edit gnutls to work with no encryption */
+		int tls = gnutls_transport_get_int(session);
+		char data[3] = {GNUTLS_ALERT, 0, 0};
+		struct msghdr msg = {0};
+		msg.msg_control = data;
+		msg.msg_controllen = sizeof(data);
+		sendmsg(tls, &msg, 0);
+	}
+
+	return 0;
+}
+
+extern int xlibgnutls_tls_terminate(gnutls_session_t session, bool offload)
+{
+	xlibgnutls_bye(session, offload);
 
 	gnutls_deinit(session);
 	gnutls_anon_free_client_credentials(anoncred);
