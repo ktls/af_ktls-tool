@@ -260,7 +260,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->plain_sendfile_user = NULL;
 	opts->plain_sendfile_mmap = NULL;
 	opts->plain_splice_emu = NULL;
-	opts->offload = 0;
+	opts->offload = false;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -274,7 +274,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 
 		switch (c) {
 			case OPT_OFFLOAD:
-				opts->offload = 1;
+				opts->offload = true;
 				break;
 			case OPT_TLS:
 				if (protocol_seen) {
