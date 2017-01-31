@@ -25,6 +25,7 @@
 #include <sys/select.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <sys/time.h>
 
 #include <gnutls/gnutls.h>
 #include <gnutls/compat.h>
@@ -561,6 +562,7 @@ static int tls_run_server(struct server_opts *opts) {
 	gnutls_anon_server_credentials_t anoncred;
 	char buffer[opts->mtu + 1];
 	int optval = 1;
+	struct timeval begin = {0}, end = {0};
 
 	// TODO: review printing
 
@@ -633,10 +635,19 @@ static int tls_run_server(struct server_opts *opts) {
 		/* see the Getting peer's information example */
 		/* print_info(session); */
 
+		gettimeofday(&begin, NULL);
 		if (opts->ktls) {
 			server_ktls_loop(opts, session, sd, (struct sockaddr *)&sa_cli, sizeof(sa_cli), buffer);
 		} else {
 			server_gnutls_loop(opts, session, buffer, sd);
+		}
+		gettimeofday(&end, NULL);
+
+		{
+			#define SEC_TO_USEC(x) ((x) * 1000000)
+			#define USEC_TO_SEC(x) ((x) / 1000000)
+			__time_t udiff = (SEC_TO_USEC(end.tv_sec) + end.tv_usec) - (SEC_TO_USEC(begin.tv_sec) + begin.tv_usec);
+			print_info("usec = %d, sec = %d\n", udiff, USEC_TO_SEC(udiff));
 		}
 
 		/*
