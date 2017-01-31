@@ -471,7 +471,8 @@ extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnu
 	end = clock();
 
 	print_send_count_stats(opts, 0, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
-	return ret < 0 ? ret : total_sent;
+	/*return ret < 0 ? ret : total_sent;*/
+	return ret < 0 ? ret : 0;
 }
 
 extern int do_send_time(const struct client_opts *opts, int ksd, void *mem, int flags) {
