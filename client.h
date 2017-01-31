@@ -33,6 +33,7 @@ struct client_opts {
 	const char *sendfile_user;
 	size_t sendfile_mtu;
 	size_t sendfile_size;
+	unsigned send_raw_count;
 	unsigned send_ktls_count;
 	unsigned send_gnutls_count;
 	unsigned payload_size;

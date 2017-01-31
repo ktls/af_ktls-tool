@@ -14,7 +14,7 @@
 
 struct client_opts;
 
-extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnutls_session_t session, int flags);
+extern int do_send_count(const struct client_opts *opts, unsigned count, int ksd, void *mem, gnutls_session_t session, int flags);
 extern int do_send_time(const struct client_opts *opts, int ksd, void *mem, int flags);
 extern int do_gnutls_send_count(const struct client_opts *opts, gnutls_session_t session, void *mem);
 extern int do_gnutls_send_time(const struct client_opts *opts, gnutls_session_t session, void *mem);

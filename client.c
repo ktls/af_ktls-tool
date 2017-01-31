@@ -98,6 +98,7 @@
 #define OPT_TCP                   0x2F
 #define OPT_UDP                   0x30
 #define OPT_OFFLOAD               0x31
+#define OPT_SEND_RAW_COUNT       0x32
 #define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:\x2B:\x2C:\x2D:\x2E:\x2F\x30"
 
 static int thread_server_port = 0;
@@ -149,6 +150,7 @@ static struct option long_options[] = {
 	/* 0x2F */{"tcp",                   no_argument,        0,  OPT_TCP},
 	/* 0x30 */{"udp",                   no_argument,        0,  OPT_UDP},
 	/* 0x31 */{"offload",               no_argument,        0,  OPT_OFFLOAD},
+	/* 0x31 */{"send-raw-count",        required_argument,  0,  OPT_SEND_RAW_COUNT},
 	{0, 0, 0, 0}
 };
 
@@ -230,6 +232,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->server_port = 5557;
 	opts->src_port = 0;
 	opts->sendfile = NULL;
+	opts->send_raw_count = 0;
 	opts->send_ktls_count = 0;
 	opts->send_gnutls_count = 0;
 	opts->payload_size = 1400;
@@ -347,6 +350,17 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 				break;
 			case OPT_SENDFILE:
 				opts->sendfile = optarg;
+				break;
+			case OPT_SEND_RAW_COUNT:
+				if (opts->send_raw_count) {
+					print_error("multiple --send-ktls-count supplied");
+					return -1;
+				}
+				opts->send_raw_count = strtoul(optarg, &tmp_ptr, 10);
+				if (*tmp_ptr != '\0' || opts->send_raw_count == 0) {
+					print_error("unknown send count '%s'", optarg);
+					return -1;
+				}
 				break;
 			case OPT_SEND_KTLS_COUNT:
 				if (opts->send_ktls_count) {
@@ -593,6 +607,7 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 
 	if (!opts->sendfile &&
 			!opts->send_gnutls_count &&
+			!opts->send_raw_count &&
 			!opts->send_ktls_count &&
 			!opts->splice_count &&
 			!opts->send_gnutls_time &&
@@ -899,7 +914,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 	int tls_init = false, err;
 	char *mem = NULL; //just a bunch of zeroed memory used as a source data
 
-	if (opts->send_ktls_count || opts->send_gnutls_count ||
+	if (opts->send_raw_count || opts->send_ktls_count || opts->send_gnutls_count ||
 			opts->send_ktls_time || opts->send_gnutls_time ||
 			opts->splice_echo_time || opts->splice_echo_count ||
 #ifdef TLS_SPLICE_SEND_RAW_TIME
@@ -1039,8 +1054,17 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		DO_DROP_CACHES(opts);
 	}
 
+	if (opts->send_raw_count) {
+		err = do_send_count(opts, opts->send_raw_count, udp_sd, mem, session, 0);
+		if (err < 0) {
+			print_error("failed to do AF_ALG send() count");
+			goto action_error;
+		}
+		DO_DROP_CACHES(opts);
+	}
+
 	if (opts->send_ktls_count) {
-		err = do_send_count(opts, udp_sd, mem, session, 0);
+		err = do_send_count(opts, opts->send_ktls_count, udp_sd, mem, session, 0);
 		if (err < 0) {
 			print_error("failed to do AF_ALG send() count");
 			goto action_error_tls_init;

@@ -61,7 +61,8 @@ out:
 	return err;
 }
 
-static void print_send_count_stats(const struct client_opts *opts, bool gnutls, size_t total_sent, size_t total_recv, double clocks) {
+static void print_send_count_stats(const struct client_opts *opts, unsigned count, bool gnutls, size_t total_sent, size_t total_recv, double clocks)
+{
 	const char *json_msg = \
 		"  {\n"
 		"    \"test\": \"%s\",\n"
@@ -86,7 +87,6 @@ static void print_send_count_stats(const struct client_opts *opts, bool gnutls, 
 
 	const char *msg = opts->json ? json_msg : txt_msg;
 	const char *name = gnutls ? "gnutls_record_send()" : "send(2)";
-	const size_t count = gnutls ? opts->send_gnutls_count : opts->send_ktls_count;
 
 	print_stats(msg, name, opts->payload_size, count, total_sent, total_recv, clocks);
 }
@@ -445,14 +445,15 @@ static void print_plain_stats(const struct client_opts *opts, const char *testna
 			elapsed);
 }
 
-extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnutls_session_t session, int flags) {
+extern int do_send_count(const struct client_opts *opts, unsigned count, int ksd, void *mem, gnutls_session_t session, int flags)
+{
 	clock_t start, end;
 	register int ret = -1;
 	register size_t total_recv = 0;
 	register size_t total_sent = 0;
 
 	start = clock();
-	for (register unsigned i = 0; i < opts->send_ktls_count; i++) {
+	for (register unsigned i = 0; i < count; i++) {
 		ret = send(ksd, mem, opts->payload_size, flags);
 		if (ret < 0)
 			perror("send");
@@ -470,7 +471,7 @@ extern int do_send_count(const struct client_opts *opts, int ksd, void *mem, gnu
 	}
 	end = clock();
 
-	print_send_count_stats(opts, 0, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
+	print_send_count_stats(opts, count, 0, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
 	/*return ret < 0 ? ret : total_sent;*/
 	return ret < 0 ? ret : 0;
 }
@@ -542,7 +543,7 @@ extern int do_gnutls_send_count(const struct client_opts *opts, gnutls_session_t
 	if (ret < 0)
 		gnutls_perror(ret);
 
-	print_send_count_stats(opts, true, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
+	print_send_count_stats(opts,  opts->send_gnutls_count, true, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
 	return ret < 0 ? ret : total_sent;
 }
 
