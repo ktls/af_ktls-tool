@@ -218,6 +218,7 @@ extern void print_hex(const char * data, size_t len) {
 	pthread_mutex_unlock(&output_mutex);
 }
 
+#if 0
 extern ssize_t gnutls_push_func_custom(gnutls_transport_ptr_t p, const void *data, size_t size) {
 	int s = (int) p;
 	int ret;
@@ -226,6 +227,7 @@ extern ssize_t gnutls_push_func_custom(gnutls_transport_ptr_t p, const void *dat
 	ret = send(s, data, size, 0);
 	return ret;
 }
+#endif
 
 extern void print_init(void) {
 	was_printed = false;

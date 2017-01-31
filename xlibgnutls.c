@@ -63,9 +63,9 @@ extern int xlibgnutls_dtls_handshake(gnutls_session_t *session, int udp_sd, unsi
 	gnutls_server_name_set(*session, GNUTLS_NAME_DNS, "my_host_name", strlen("my_host_name"));
 
 	if (verbose_level >= VERBOSE_LEVEL_PACKETS) {
-		gnutls_transport_set_push_function(*session, gnutls_push_func_custom);
-		//gnutls_transport_set_pull_function(*session, gnutls_pull_func_custom);
-		//gnutls_transport_set_pull_timeout_function(*session, gnutls_pull_timeout_func_custom);
+		/*gnutls_transport_set_push_function(*session, gnutls_push_func_custom);*/
+		/*gnutls_transport_set_pull_function(*session, gnutls_pull_func_custom);*/
+		/*gnutls_transport_set_pull_timeout_function(*session, gnutls_pull_timeout_func_custom);*/
 	}
 
 	gnutls_dtls_set_mtu(*session, 1 << 14);
