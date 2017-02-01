@@ -69,6 +69,13 @@ static gnutls_certificate_credentials_t x509_cred;
 static gnutls_dh_params_t dh_params;
 
 
+static inline uint64_t get_u64_sequence(unsigned char sequence[8])
+{
+	uint64_t seq;
+	memcpy(&seq, sequence, sizeof(seq));
+	return be64toh(seq);
+}
+
 static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t session,
 								char *buffer, int sd) {
 	int ret;
@@ -94,7 +101,9 @@ static int server_gnutls_loop(const struct server_opts *opts, gnutls_session_t s
 				print_warning("*** Warning: %s", gnutls_strerror(ret));
 				continue;
 			} else if (ret < 0) {
-				print_error("Error in recv(): %s", gnutls_strerror(ret));
+				print_error("Error in recv(): %s expected_seq:0x%llx",
+					    gnutls_strerror(ret),
+					    get_u64_sequence(sequence));
 				break;
 			}
 		}
