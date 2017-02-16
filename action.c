@@ -544,7 +544,8 @@ extern int do_gnutls_send_count(const struct client_opts *opts, gnutls_session_t
 		gnutls_perror(ret);
 
 	print_send_count_stats(opts,  opts->send_gnutls_count, true, total_sent, total_recv, ((double) (end - start)) / CLOCKS_PER_SEC);
-	return ret < 0 ? ret : total_sent;
+	/*return ret < 0 ? ret : total_sent;*/
+	return ret < 0 ? ret : 0;
 }
 
 extern int do_gnutls_send_time(const struct client_opts *opts, gnutls_session_t session, void *mem) {
