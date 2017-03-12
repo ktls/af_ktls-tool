@@ -167,10 +167,7 @@ static int xlibgnutls_bye(gnutls_session_t session, bool offload)
 		 * TODO: Edit gnutls to work with no encryption */
 		int tls = gnutls_transport_get_int(session);
 		char data[3] = {GNUTLS_ALERT, 0, 0};
-		struct msghdr msg = {0};
-		msg.msg_control = data;
-		msg.msg_controllen = sizeof(data);
-		sendmsg(tls, &msg, 0);
+		send(tls, data, sizeof(data), MSG_OOB);
 	}
 
 	return 0;
