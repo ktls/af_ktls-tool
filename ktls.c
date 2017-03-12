@@ -56,12 +56,8 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 	 * TODO: [AY] get it from certificate */
 	crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
 
-	/* for now we always work in HW offload mode */
-	if (!offload) {
-		print_error("kernel tls support only offload mode for now");
-		goto err;
-	}
-	crypto_info.info.offload_state = TLS_OFFLOAD_STATE_HW;
+	crypto_info.info.offload_state = offload ? TLS_OFFLOAD_STATE_HW :
+		TLS_OFFLOAD_STATE_SW;
 
 	if (send) {
 		memcpy(crypto_info.iv, seq_number_write, TLS_CIPHER_AES_GCM_128_IV_SIZE);
