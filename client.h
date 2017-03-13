@@ -25,6 +25,7 @@
 
 struct client_opts {
 	bool tls;
+	bool ktls;
 	bool tcp;
 	const char *server_host;
 	unsigned server_port;

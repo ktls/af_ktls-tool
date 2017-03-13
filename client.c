@@ -764,6 +764,17 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 		if (!opts->splice_file)
 			opts->splice_file = "/dev/zero";
 
+	if (opts->send_ktls_count || opts->sendfile || opts->splice_count
+			|| opts->send_ktls_time || opts->send_gnutls_time || opts->splice_time
+			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify
+#ifdef TLS_SPLICE_SEND_RAW_TIME
+			|| opts->splice_send_raw_time) {
+#else
+			) {
+#endif
+		opts->ktls = true;
+	}
+
 	return 0;
 }
 
@@ -977,14 +988,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 		DO_DROP_CACHES(opts);
 	}
 
-	if (opts->send_ktls_count || opts->sendfile || opts->splice_count
-			|| opts->send_ktls_time || opts->send_gnutls_time || opts->splice_time
-			|| opts->splice_echo_count || opts->splice_echo_time || opts->verify
-#ifdef TLS_SPLICE_SEND_RAW_TIME
-			|| opts->splice_send_raw_time) {
-#else
-			) {
-#endif
+	if (opts->ktls) {
 #ifdef TLS_SET_MTU
 		err = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, true, opts->tls, opts->offload);
 #else
@@ -1175,7 +1179,7 @@ static int run_client(const struct client_opts *opts) {
 		err = do_action(opts, session, sd);
 
 		if (opts->tls)
-			xlibgnutls_tls_terminate(session, opts->offload);
+			xlibgnutls_tls_terminate(session, opts->ktls);
 		else
 			xlibgnutls_dtls_terminate(session);
 	}

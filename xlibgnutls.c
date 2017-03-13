@@ -158,9 +158,9 @@ typedef enum content_type_t {
 } content_type_t;
 
 
-static int xlibgnutls_bye(gnutls_session_t session, bool offload)
+static int xlibgnutls_bye(gnutls_session_t session, bool ktls)
 {
-	if (!offload) {
+	if (!ktls) {
 		gnutls_bye(session, GNUTLS_SHUT_WR);
 	} else {
 		/* HACK to send control message directly from the tool
@@ -173,9 +173,9 @@ static int xlibgnutls_bye(gnutls_session_t session, bool offload)
 	return 0;
 }
 
-extern int xlibgnutls_tls_terminate(gnutls_session_t session, bool offload)
+extern int xlibgnutls_tls_terminate(gnutls_session_t session, bool ktls)
 {
-	xlibgnutls_bye(session, offload);
+	xlibgnutls_bye(session, ktls);
 
 	gnutls_deinit(session);
 	gnutls_anon_free_client_credentials(anoncred);
