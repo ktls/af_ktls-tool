@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <linux/tls.h>
+
 // this is ugly, but let's simplify things
 static gnutls_certificate_credentials_t xcred;
 static gnutls_anon_client_credentials_t anoncred;
@@ -157,7 +159,6 @@ typedef enum content_type_t {
 	GNUTLS_HEARTBEAT
 } content_type_t;
 
-
 static int xlibgnutls_bye(gnutls_session_t session, bool ktls)
 {
 	if (!ktls) {
@@ -165,9 +166,16 @@ static int xlibgnutls_bye(gnutls_session_t session, bool ktls)
 	} else {
 		/* HACK to send control message directly from the tool
 		 * TODO: Edit gnutls to work with no encryption */
-		int tls = gnutls_transport_get_int(session);
-		char data[3] = {GNUTLS_ALERT, 0, 0};
-		send(tls, data, sizeof(data), MSG_OOB);
+		int sock = gnutls_transport_get_int(session);
+		struct tls_ctrlmsg *ctrl;
+		unsigned char buf[sizeof(*ctrl) + 2];
+
+		ctrl = (void *)buf;
+		ctrl->type	= GNUTLS_ALERT;
+		ctrl->data[0]	= 0;				/* level */
+		ctrl->data[1]	= GNUTLS_A_CLOSE_NOTIFY;	/* desc */
+
+		send(sock, ctrl, sizeof(buf), MSG_OOB);
 	}
 
 	return 0;

@@ -56,8 +56,7 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 	 * TODO: [AY] get it from certificate */
 	crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
 
-	crypto_info.info.offload_state = offload ? TLS_OFFLOAD_STATE_HW :
-		TLS_OFFLOAD_STATE_SW;
+	crypto_info.info.state = offload ? TLS_STATE_HW : TLS_STATE_SW;
 
 	if (send) {
 		memcpy(crypto_info.iv, seq_number_write, TLS_CIPHER_AES_GCM_128_IV_SIZE);
@@ -134,11 +133,11 @@ static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool 
 	}
 
 	/* check offload state */
-	if (offload && crypto_info.info.offload_state != TLS_OFFLOAD_STATE_HW) {
+	if (offload && crypto_info.info.state != TLS_STATE_HW) {
 		print_error("incorrect offload state queried");
 		goto err;
 	}
-	if (!offload && crypto_info.info.offload_state != TLS_OFFLOAD_STATE_SW) {
+	if (!offload && crypto_info.info.state != TLS_STATE_SW) {
 		print_error("incorrect offload state queried");
 		goto err;
 	}
