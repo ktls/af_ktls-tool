@@ -159,6 +159,34 @@ typedef enum content_type_t {
 	GNUTLS_HEARTBEAT
 } content_type_t;
 
+#define SOL_TLS		282
+
+static int klts_send_ctrl_message(int fd, unsigned char record_type,
+				  void *data, size_t length)
+{
+	struct msghdr msg = {0};
+	int cmsg_len = sizeof(record_type);
+	struct cmsghdr *cmsg;
+	char buf[CMSG_SPACE(cmsg_len)];
+	struct iovec msg_iov;	/* Vector of data to send/receive into.  */
+
+	msg.msg_control = buf;
+	msg.msg_controllen = sizeof(buf);
+	cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_TLS;
+	cmsg->cmsg_type = TLS_SET_RECORD_TYPE;
+	cmsg->cmsg_len = CMSG_LEN(cmsg_len);
+	*((unsigned char *)CMSG_DATA(cmsg)) = record_type;
+	msg.msg_controllen = cmsg->cmsg_len;
+
+	msg_iov.iov_base = data;
+	msg_iov.iov_len = length;
+	msg.msg_iov = &msg_iov;
+	msg.msg_iovlen = 1;
+
+	return sendmsg(fd, &msg, 0);
+}
+
 static int xlibgnutls_bye(gnutls_session_t session, bool ktls)
 {
 	if (!ktls) {
@@ -167,15 +195,10 @@ static int xlibgnutls_bye(gnutls_session_t session, bool ktls)
 		/* HACK to send control message directly from the tool
 		 * TODO: Edit gnutls to work with no encryption */
 		int sock = gnutls_transport_get_int(session);
-		struct tls_ctrlmsg *ctrl;
-		unsigned char buf[sizeof(*ctrl) + 2];
+		unsigned char alert_payload[2] = {0, GNUTLS_A_CLOSE_NOTIFY};
 
-		ctrl = (void *)buf;
-		ctrl->type	= GNUTLS_ALERT;
-		ctrl->data[0]	= 0;				/* level */
-		ctrl->data[1]	= GNUTLS_A_CLOSE_NOTIFY;	/* desc */
+		klts_send_ctrl_message(sock, GNUTLS_ALERT, alert_payload, 2);
 
-		send(sock, ctrl, sizeof(buf), MSG_OOB);
 	}
 
 	return 0;
