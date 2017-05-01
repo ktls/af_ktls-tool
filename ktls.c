@@ -17,14 +17,11 @@
 #include "common.h"
 #include "ktls.h"
 
-#include <linux/tls.h>
-
-# define SOL_TCP		6	/* TCP level */
-
+#include "netinet/tcp.h"
 
 static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool send, bool tls, bool offload)
 {
-	struct tls_crypto_info_aes_gcm_128 crypto_info;
+	struct tls12_crypto_info_aes_gcm_128 crypto_info;
 	int optname, rc = -1;
 	gnutls_datum_t mac_key;
 	gnutls_datum_t iv_read;
@@ -56,10 +53,13 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 	 * TODO: [AY] get it from certificate */
 	crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
 
-	crypto_info.info.state = offload ? TLS_STATE_HW : TLS_STATE_SW;
+	crypto_info.info.state = offload ? TLS_STATE_HW :
+		TLS_STATE_SW;
 
 	if (send) {
 		memcpy(crypto_info.iv, seq_number_write, TLS_CIPHER_AES_GCM_128_IV_SIZE);
+		memcpy(crypto_info.rec_seq, seq_number_write,
+		       TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE);
 		if (cipher_key_write.size != TLS_CIPHER_AES_GCM_128_KEY_SIZE) {
 			print_error("mismatch in send key size");
 			goto err;
@@ -102,7 +102,7 @@ err:
 
 static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool send, bool offload)
 {
-	struct tls_crypto_info_aes_gcm_128 crypto_info;
+	struct tls12_crypto_info_aes_gcm_128 crypto_info;
 	int optname, rc = -1;
 	socklen_t optlen = sizeof(crypto_info);
 

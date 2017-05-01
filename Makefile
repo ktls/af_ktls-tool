@@ -1,5 +1,5 @@
 CC = gcc -std=gnu99 -g
-CFLAGS = -Wall -pedantic -O2
+CFLAGS = -Wall -O2 #-pedantic
 LDFLAGS = -lgnutls -lpthread
 
 all: client server

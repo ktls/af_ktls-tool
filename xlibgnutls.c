@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include <linux/tls.h>
+#include "netinet/tcp.h"
 
 // this is ugly, but let's simplify things
 static gnutls_certificate_credentials_t xcred;
@@ -158,8 +158,6 @@ typedef enum content_type_t {
 	GNUTLS_HANDSHAKE, GNUTLS_APPLICATION_DATA,
 	GNUTLS_HEARTBEAT
 } content_type_t;
-
-#define SOL_TLS		282
 
 static int klts_send_ctrl_message(int fd, unsigned char record_type,
 				  void *data, size_t length)
