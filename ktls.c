@@ -66,7 +66,7 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 		}
 		memcpy(crypto_info.key, cipher_key_write.data, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
 		memcpy(crypto_info.salt, iv_write.data, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
-		optname = TCP_TLS_TX;
+		optname = TLS_TX;
 	} else {
 		/*
 		 * Gnu TLS this is a workaround since Gnu TLS does not propagate recv seq num
@@ -85,12 +85,22 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 		}
 		memcpy(crypto_info.key, cipher_key_read.data, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
 		memcpy(crypto_info.salt, iv_read.data, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
-		optname = TCP_TLS_RX;
+
+		print_error("No RX support yet.\n");
+		rc = -1;
+		goto err;
+		//optname = TLS_RX;
+	}
+	rc = setsockopt(ksd, SOL_TCP, TCP_ULP, "tls", sizeof("tls"));
+	if (rc < 0) {
+		print_error("failed to set ULP %d\n", rc);
+		goto err;
 	}
 
-	rc = setsockopt(ksd, SOL_TCP, optname, &crypto_info, sizeof(crypto_info));
+	rc = setsockopt(ksd, SOL_TLS, optname,
+			&crypto_info, sizeof(crypto_info));
 	if (rc < 0) {
-		print_error("failed to set send crypto info using setsockopt(2)");
+		print_error("failed to set send crypto info using setsockopt(2) %d", rc);
 		goto err;
 	}
 
@@ -107,14 +117,17 @@ static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool 
 	socklen_t optlen = sizeof(crypto_info);
 
 	if (send) {
-		optname = TCP_TLS_TX;
+		optname = TLS_TX;
 	} else {
-		optname = TCP_TLS_RX;
+		print_error("No RX support yet.\n");
+		rc = -1;
+		goto err;
+		//optname = TCP_TLS_RX;
 	}
 
 	memset(&crypto_info, 0, sizeof(crypto_info));
 
-	rc = getsockopt(ksd, SOL_TCP, optname, &crypto_info, &optlen);
+	rc = getsockopt(ksd, SOL_TLS, optname, &crypto_info, &optlen);
 	if (rc < 0) {
 		print_error("failed to get send crypto info using getsockopt(2)");
 		goto err;
