@@ -286,15 +286,9 @@ struct tcp_md5sig
 
 #define TLS_SET_RECORD_TYPE	1
 
-enum tls_state {
-	TLS_STATE_SW = 0x0,
-	TLS_STATE_HW = 0x1,
-};
-
 struct tls_crypto_info {
 	unsigned short version;
 	unsigned short cipher_type;
-	unsigned int state;
 };
 
 struct tls12_crypto_info_aes_gcm_128 {

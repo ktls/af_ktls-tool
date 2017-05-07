@@ -19,7 +19,7 @@
 
 #include "netinet/tcp.h"
 
-static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool send, bool tls, bool offload)
+static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool send, bool tls)
 {
 	struct tls12_crypto_info_aes_gcm_128 crypto_info;
 	int optname, rc = -1;
@@ -52,9 +52,6 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 	/* cipher type is hardcoded for now
 	 * TODO: [AY] get it from certificate */
 	crypto_info.info.cipher_type = TLS_CIPHER_AES_GCM_128;
-
-	crypto_info.info.state = offload ? TLS_STATE_HW :
-		TLS_STATE_SW;
 
 	if (send) {
 		memcpy(crypto_info.iv, seq_number_write, TLS_CIPHER_AES_GCM_128_IV_SIZE);
@@ -110,7 +107,7 @@ err:
 	return rc;
 }
 
-static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool send, bool offload)
+static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool send)
 {
 	struct tls12_crypto_info_aes_gcm_128 crypto_info;
 	int optname, rc = -1;
@@ -145,16 +142,6 @@ static int ktls_socket_get_crypto_state(gnutls_session_t session, int ksd, bool 
 		goto err;
 	}
 
-	/* check offload state */
-	if (offload && crypto_info.info.state != TLS_STATE_HW) {
-		print_error("incorrect offload state queried");
-		goto err;
-	}
-	if (!offload && crypto_info.info.state != TLS_STATE_SW) {
-		print_error("incorrect offload state queried");
-		goto err;
-	}
-
 	/* we set only sequence number */
 	rc = gnutls_record_set_state(session, !send, crypto_info.iv);
 	if (rc) {
@@ -170,14 +157,14 @@ err:
 
 
 #ifdef TLS_SET_MTU
-extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool send, bool tls, bool offload)
+extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool send, bool tls)
 #else
-extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tls, bool offload)
+extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tls)
 #endif
 {
 	int err;
 
-	err = ktls_socket_set_crypto_state(session, sd, send, tls, offload);
+	err = ktls_socket_set_crypto_state(session, sd, send, tls);
 	if (err) {
 		print_error("failed to set crypto state");
 		goto set_crypto_error;
@@ -200,11 +187,11 @@ set_crypto_error:
 	return err;
 }
 
-extern int ktls_socket_destruct(gnutls_session_t session, int sd, bool send, bool offload)
+extern int ktls_socket_destruct(gnutls_session_t session, int sd, bool send)
 {
 	int err;
 
-	err = ktls_socket_get_crypto_state(session, sd, send, offload);
+	err = ktls_socket_get_crypto_state(session, sd, send);
 	if (err < 0) {
 		print_error("failed to get crypto state");
 		goto get_crypto_error;

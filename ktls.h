@@ -13,10 +13,10 @@
 #define KTLS_H_
 
 #ifdef TLS_SET_MTU
-extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool send, bool tls, bool offload);
+extern int ktls_socket_init(gnutls_session_t session, int sd, size_t sendfile_mtu, bool send, bool tls);
 #else
-extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tls, bool offload);
+extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tls);
 #endif
-extern int ktls_socket_destruct(gnutls_session_t session, int sd, bool send, bool offload);
+extern int ktls_socket_destruct(gnutls_session_t session, int sd, bool send);
 
 #endif // KTLS_H_

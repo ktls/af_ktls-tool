@@ -56,7 +56,6 @@ struct client_opts {
 	const char *output;
 	bool server_no_echo;
 	unsigned server_mtu;
-	bool offload;
 	unsigned raw_send_time;
 #ifdef TLS_SPLICE_SEND_RAW_TIME
 	unsigned splice_send_raw_time;

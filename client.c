@@ -97,7 +97,6 @@
 #define OPT_PLAIN_SENDFILE_MMAP   0x2E
 #define OPT_TCP                   0x2F
 #define OPT_UDP                   0x30
-#define OPT_OFFLOAD               0x31
 #define OPT_SEND_RAW_COUNT       0x32
 #define OPT_SHORT_OPTS          "td\x03:p:\x05:\x06:\x07:\x08:\x09:\x0A:m:vh\x0E:\x0F:\x10:\x11:\x12\x13\x14:\x15:\x16:\x17\x18\x19jc\x21\x22\x23\x24\x25o:\x26:\x27\x28:\x29:\x2A:\x2B:\x2C:\x2D:\x2E:\x2F\x30"
 
@@ -149,7 +148,6 @@ static struct option long_options[] = {
 	/* 0x2E */{"plain-sendfile-mmap",   required_argument,  0,  OPT_PLAIN_SENDFILE_MMAP},
 	/* 0x2F */{"tcp",                   no_argument,        0,  OPT_TCP},
 	/* 0x30 */{"udp",                   no_argument,        0,  OPT_UDP},
-	/* 0x31 */{"offload",               no_argument,        0,  OPT_OFFLOAD},
 	/* 0x31 */{"send-raw-count",        required_argument,  0,  OPT_SEND_RAW_COUNT},
 	{0, 0, 0, 0}
 };
@@ -263,7 +261,6 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 	opts->plain_sendfile_user = NULL;
 	opts->plain_sendfile_mmap = NULL;
 	opts->plain_splice_emu = NULL;
-	opts->offload = false;
 	// we will check for multiple occurrences for these, default values assigned
 	// later
 	opts->splice_file = NULL;
@@ -276,9 +273,6 @@ static int parse_opts(struct client_opts *opts, int argc, char *argv[]) {
 			break;
 
 		switch (c) {
-			case OPT_OFFLOAD:
-				opts->offload = true;
-				break;
 			case OPT_TLS:
 				if (protocol_seen) {
 					print_error("option '--dtls' is disjoint with --tls");
@@ -990,9 +984,9 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 
 	if (opts->ktls) {
 #ifdef TLS_SET_MTU
-		err = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, true, opts->tls, opts->offload);
+		err = ktls_socket_init(session, udp_sd, opts->sendfile_mtu, true, opts->tls);
 #else
-		err = ktls_socket_init(session, udp_sd, true, opts->tls, opts->offload);
+		err = ktls_socket_init(session, udp_sd, true, opts->tls);
 #endif
 		if (err < 0) {
 			print_error("failed to get AF_KTLS socket");
@@ -1126,7 +1120,7 @@ static int do_action(const struct client_opts *opts, gnutls_session_t session,  
 	err = 0;
 action_error_tls_init:
 	if (tls_init)
-		ktls_socket_destruct(session, udp_sd, true, opts->offload);
+		ktls_socket_destruct(session, udp_sd, true);
 action_error:
 	if (mem)
 		free(mem);

@@ -152,9 +152,9 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 	socklen_t cli_addr_size_tmp;
 
 #ifdef TLS_SET_MTU
-	err = ktls_socket_init(session, sd, 0, false, opts->tls, false);
+	err = ktls_socket_init(session, sd, 0, false, opts->tls);
 #else
-	err = ktls_socket_init(session, sd, false, opts->tls, false);
+	err = ktls_socket_init(session, sd, false, opts->tls);
 #endif
 	if (err < 0) {
 		print_error("failed to make AF_KTLS socket on server");
@@ -191,7 +191,7 @@ static int server_ktls_loop(const struct server_opts *opts, gnutls_session_t ses
 
 ktls_loop_end:
 	if (tls_init)
-		ktls_socket_destruct(session, sd, false, false);
+		ktls_socket_destruct(session, sd, false);
 	return err < 0 ? err : 0;
 }
 
