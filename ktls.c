@@ -76,6 +76,8 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 			seq_number_read[7] = 1;
 		}
 		memcpy(crypto_info.iv, seq_number_read, TLS_CIPHER_AES_GCM_128_IV_SIZE);
+		memcpy(crypto_info.rec_seq, seq_number_read,
+		       TLS_CIPHER_AES_GCM_128_REC_SEQ_SIZE);
 		if (cipher_key_read.size != TLS_CIPHER_AES_GCM_128_KEY_SIZE) {
 			print_error("mismatch in recv key size");
 			goto err;
@@ -83,16 +85,15 @@ static int ktls_socket_set_crypto_state(gnutls_session_t session, int ksd, bool 
 		memcpy(crypto_info.key, cipher_key_read.data, TLS_CIPHER_AES_GCM_128_KEY_SIZE);
 		memcpy(crypto_info.salt, iv_read.data, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
 
-		print_error("No RX support yet.\n");
-		rc = -1;
-		goto err;
-		//optname = TLS_RX;
+		optname = TLS_RX;
 	}
-	rc = setsockopt(ksd, SOL_TCP, TCP_ULP, "tls", sizeof("tls"));
-	if (rc < 0) {
-		print_error("failed to set ULP %d\n", rc);
-		goto err;
-	}
+        if (send) {
+          rc = setsockopt(ksd, SOL_TCP, TCP_ULP, "tls", sizeof("tls"));
+          if (rc < 0) {
+            print_error("failed to set ULP %d\n", rc);
+            goto err;
+          }
+        }
 
 	rc = setsockopt(ksd, SOL_TLS, optname,
 			&crypto_info, sizeof(crypto_info));
@@ -164,11 +165,18 @@ extern int ktls_socket_init(gnutls_session_t session, int sd, bool send, bool tl
 {
 	int err;
 
-	err = ktls_socket_set_crypto_state(session, sd, send, tls);
+	err = ktls_socket_set_crypto_state(session, sd, true, tls);
 	if (err) {
-		print_error("failed to set crypto state");
+		print_error("failed to set crypto state send");
 		goto set_crypto_error;
 	}
+        printf("Set crypto state send\n");
+	err = ktls_socket_set_crypto_state(session, sd, false, tls);
+	if (err) {
+		print_error("failed to set crypto state recv");
+		goto set_crypto_error;
+	}
+        printf("Set cryto state recv\n");
 
 #ifdef TLS_SET_MTU
 	if (sendfile_mtu) {

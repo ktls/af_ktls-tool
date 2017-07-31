@@ -1,6 +1,6 @@
 CC = gcc -std=gnu99 -g
 CFLAGS = -Wall -O2 #-pedantic
-LDFLAGS = -lgnutls -lpthread
+LDFLAGS = -lgnutls -lpthread -L/usr/lib
 
 all: client server
 
